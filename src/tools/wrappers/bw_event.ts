@@ -1,0 +1,85 @@
+import type { ToolDef } from "../../types.js";
+import type { BitwardenHttpClient } from "../../http/bitwarden-http-client.js";
+import { fetchAllPages } from "../../http/pagination.js";
+import { asToolError, jsonResult } from "../_error.js";
+import { readOnly, maybeNoteOversize, type Limits } from "./_helpers.js";
+
+type Event = { type: number; [k: string]: unknown };
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+export function makeEventQueryTool(
+  client: BitwardenHttpClient,
+  limits: Limits,
+  maxResponseBytes: number = 60_000,
+): ToolDef {
+  return {
+    name: "bw_event_query",
+    description:
+      "Query the organization event log with optional filters (self-host). " +
+      "Defaults to the last 24 hours when no start/end are provided. " +
+      "Querying wider windows may produce very large responses. " +
+      "Auto-paginates with continuationToken.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        start: { type: "string", description: "ISO 8601, inclusive. Defaults to 24 h ago." },
+        end: { type: "string", description: "ISO 8601, inclusive. Defaults to now." },
+        actingUserId: { type: "string" },
+        itemId: { type: "string" },
+        ipAddress: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+    annotations: readOnly,
+    handler: async (input) => {
+      try {
+        const now = new Date();
+        const defaultStart = new Date(now.getTime() - MS_PER_DAY);
+
+        const rawStart = typeof input.start === "string" ? input.start : undefined;
+        const rawEnd = typeof input.end === "string" ? input.end : undefined;
+
+        // Apply defaults when not provided
+        const effectiveStart = rawStart ?? defaultStart.toISOString();
+        const effectiveEnd = rawEnd ?? now.toISOString();
+
+        const query: Record<string, string | number | boolean | undefined | null> = {
+          start: effectiveStart,
+          end: effectiveEnd,
+        };
+        for (const k of ["actingUserId", "itemId", "ipAddress"]) {
+          if (typeof input[k] === "string") query[k] = input[k] as string;
+        }
+
+        // Check whether the caller requested a window wider than 24h
+        const startMs = new Date(effectiveStart).getTime();
+        const endMs = new Date(effectiveEnd).getTime();
+        const wideWindow = !isNaN(startMs) && !isNaN(endMs) && (endMs - startMs) > MS_PER_DAY;
+
+        const page = await fetchAllPages<Event>(
+          client.request.bind(client), "GET", "/public/events", query, limits,
+        );
+
+        const payload = {
+          events: page.items,
+          truncated: page.truncated,
+          continuationToken: page.continuationToken ?? null,
+        };
+
+        const oversize = maybeNoteOversize(payload, maxResponseBytes, false);
+
+        // Compose notes: wide-window warning takes precedence; oversize note is appended if also triggered
+        let note: string | undefined;
+        if (wideWindow) {
+          note = "Querying a > 24h window — response size may be large.";
+          if (oversize.note) note += " " + oversize.note;
+        } else if (oversize.note) {
+          note = oversize.note;
+        }
+
+        return jsonResult({ ...payload, ...(note !== undefined ? { note } : {}) });
+      } catch (err) { return asToolError(err); }
+    },
+  };
+}
