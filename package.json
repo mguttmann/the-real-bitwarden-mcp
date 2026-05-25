@@ -1,0 +1,91 @@
+{
+  "name": "the-real-bitwarden-mcp",
+  "version": "0.1.1",
+  "description": "Local stdio MCP server for the Bitwarden Public API and Secrets Manager — members, groups, collections, policies, license seats, SM projects and secrets.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "bitwarden-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "ARCHITECTURE.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "LICENSE",
+    ".env.example"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Manuel Guttmann",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mguttmann/the-real-bitwarden-mcp.git"
+  },
+  "homepage": "https://github.com/mguttmann/the-real-bitwarden-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/mguttmann/the-real-bitwarden-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "bitwarden",
+    "bitwarden-public-api",
+    "bitwarden-secrets-manager",
+    "password-manager",
+    "secrets-manager",
+    "self-hosted",
+    "credentials",
+    "claude",
+    "claude-code",
+    "anthropic",
+    "ai-tools",
+    "stdio",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "prepublishOnly": "npm run build && npm test",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:live": "RUN_LIVE_TESTS=1 vitest run tests/live-smoke.test.ts",
+    "generate": "tsx scripts/generate.ts",
+    "refresh-spec": "tsx scripts/refresh-spec.ts",
+    "refresh-snapshot": "tsx scripts/refresh-snapshot.ts",
+    "inspector": "npx @modelcontextprotocol/inspector node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "dotenv": "^16.4.0",
+    "pino": "^9.0.0"
+  },
+  "optionalDependencies": {
+    "@bitwarden/sdk-napi": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^4.1.8",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^9.1.2",
+    "prettier": "^3.8.4",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0",
+    "typescript-eslint": "^8.61.0",
+    "vitest": "^4.1.8"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

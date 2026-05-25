@@ -1,0 +1,27 @@
+# Local environment & secrets
+.env
+.env.local
+*.env
+
+# Node / build
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Test coverage reports
+coverage/
+
+# Local developer notes & internal design docs (not for the public repo)
+.remember/
+docs/superpowers/
+docs/internal/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs & tmp
+logs/
+tmp/
+*.log

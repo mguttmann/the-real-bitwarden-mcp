@@ -1,0 +1,6 @@
+dist/
+node_modules/
+coverage/
+src/tools/generated/
+specs/public-api.spec.json
+package-lock.json

@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest a new tool, behaviour, or improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Open one of these **before** you write code — let's agree on the
+        direction first so your PR has a clear runway.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case, not the implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        If this maps to a Bitwarden Public API endpoint or an SDK call, link
+        the official docs. If it's a behaviour change, sketch the new shape.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

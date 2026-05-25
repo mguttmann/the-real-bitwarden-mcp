@@ -1,0 +1,72 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **Please make sure your repro is scrubbed of
+        organisation IDs, member emails, secrets, and access tokens** before
+        you post — this is a public issue tracker.
+
+        For security vulnerabilities, see [SECURITY.md](../blob/main/SECURITY.md)
+        instead; do not file public issues for those.
+  - type: input
+    id: tool
+    attributes:
+      label: Failing tool
+      description: Which MCP tool returned the bad result?
+      placeholder: bw_member_invite
+    validations:
+      required: true
+  - type: textarea
+    id: arguments
+    attributes:
+      label: Arguments
+      description: The arguments you passed (scrubbed).
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual response
+      description: The tool's response (scrubbed).
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: input
+    id: bitwarden-version
+    attributes:
+      label: Bitwarden version
+      description: For self-host, fetch `/api/version`; for cloud, write "cloud".
+      placeholder: "2025.12.0"
+    validations:
+      required: true
+  - type: input
+    id: mcp-version
+    attributes:
+      label: MCP server version
+      description: From `package.json` or `npm ls the-real-bitwarden-mcp`.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      placeholder: "20.18.0"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs (optional)
+      description: Server logs with secrets redacted. Set `LOG_LEVEL=debug` for more detail.
+      render: text
