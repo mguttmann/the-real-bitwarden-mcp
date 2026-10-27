@@ -106,11 +106,17 @@ parameters are unchanged (pinned by `tests/tool-contract.test.ts`).
   `secretsManager.serviceAccounts`), GET it again and return
   `{field, before, requested, after, response}`. An adjustment of 0, a
   resulting total below 1, a missing current value, or a read-back that
-  differs from the requested total return an error.
+  differs from the requested total return an error. A PUT with an unknown
+  outcome (5xx, network error, timeout) and a failed read-back after a
+  successful PUT return an error that tells the caller to check
+  `bw_license_subscription_get` before retrying; nothing is retried
+  automatically.
 - **HTTP retries only where repeating is safe.** 5xx responses and network
   errors are retried only for GET (before: 5xx for every method, network
-  errors never). POST/PUT/PATCH/DELETE are sent once; on 5xx the error text
-  says the outcome is unknown. 429 is still retried for every method.
+  errors never). POST/PUT/PATCH/DELETE are sent once; on 5xx and on a
+  network error or timeout the error text says the outcome is unknown
+  (a network error on a write is a `BitwardenApiError` with status 0 and
+  code `network_error`). 429 is still retried for every method.
   `Retry-After` now also accepts an HTTP-date and the wait is capped at
   30 s (before: an HTTP-date caused an immediate retry, large values were
   not capped).
@@ -214,7 +220,8 @@ out after <ms> ms`.
   `accessAll`, collection `users` and `bw_event_query` filters no longer
   report success without effect (see Breaking).
 - Writes are no longer repeated after a 5xx answer; reads are now also
-  retried after network errors.
+  retried after network errors. A write that fails with a 5xx, a network
+  error or a timeout says the outcome is unknown.
 - The npm bin `bitwarden-mcp` starts the server (it exited with code 0
   when started through the symlink).
 - `serverInfo.version` reports the package version (was `0.1.0`).

@@ -102,4 +102,5 @@ Out of scope:
   Calls into the Secrets Manager SDK have no timeout of their own.
 - Writes (POST, PUT, PATCH, DELETE) are not retried after a 5xx or a
   network error; only a 429 answer (request not processed) is retried
-  for every method.
+  for every method. Both cases report that the write may or may not have
+  been applied.

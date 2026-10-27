@@ -1,6 +1,8 @@
 import type { PlannedRequest, ToolDef } from "../../types.js";
-import type { BitwardenHttpClient } from "../../http/bitwarden-http-client.js";
+import { isOutcomeUnknown, type BitwardenHttpClient } from "../../http/bitwarden-http-client.js";
 import { asToolError, jsonResult } from "../_error.js";
+import { scrubClientText } from "../../redact.js";
+import { BitwardenApiError } from "../../http/errors.js";
 import { readOnly, destructive, requireInt } from "./_helpers.js";
 
 export function makeLicenseSubscriptionGetTool(client: BitwardenHttpClient): ToolDef {
@@ -97,9 +99,30 @@ function makeLicenseUpdateTool(
     handler: async (input) => {
       try {
         const plan = await planLicenseUpdate(client, f, input);
-        const res = await client.request(plan.method, plan.path, { body: plan.body });
+        let res;
+        try {
+          res = await client.request(plan.method, plan.path, { body: plan.body });
+        } catch (err) {
+          if (!isOutcomeUnknown(err)) throw err;
+          return errorText(
+            `${errorMessage(err)}\nThe ${f.label} update (${plan.before} -> ${plan.target}) may ` +
+              "already be applied. This tool takes a delta: check the current total with " +
+              "bw_license_subscription_get before retrying, or the delta may be applied twice.",
+          );
+        }
         // The endpoint answers 200 even when it applies nothing, so read the total back.
-        const after = await readTotal(client, f);
+        let after: unknown;
+        try {
+          after = await readTotal(client, f);
+        } catch (err) {
+          // No automatic retry: the PUT was accepted, repeating the delta would apply it twice.
+          return errorText(
+            `The PUT ${plan.path} (${f.label}: ${plan.before} -> ${plan.target}) was answered ` +
+              `successfully, but the read-back of the new total failed: ${errorMessage(err)}\n` +
+              "The change has probably been applied. Check with bw_license_subscription_get " +
+              "before retrying; do not repeat the update blindly (it takes a delta).",
+          );
+        }
         const result = {
           field: `${f.product}.${f.field}`,
           before: plan.before,
@@ -126,6 +149,15 @@ function makeLicenseUpdateTool(
       }
     },
   };
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof BitwardenApiError) return err.toString();
+  return err instanceof Error ? err.message : String(err);
+}
+
+function errorText(text: string) {
+  return { content: [{ type: "text" as const, text: scrubClientText(text) }], isError: true };
 }
 
 const BILLING_NOTE =

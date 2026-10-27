@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { BitwardenHttpClient } from "../src/http/bitwarden-http-client.js";
+import { BitwardenHttpClient, isOutcomeUnknown } from "../src/http/bitwarden-http-client.js";
+import { BitwardenApiError } from "../src/http/errors.js";
+import { asToolError } from "../src/tools/_error.js";
 import type { OAuthTokenCache } from "../src/http/oauth-token-cache.js";
 
 const tokenCache = { getToken: async () => "FAKE-TOKEN-1", invalidate: () => {} };
@@ -65,6 +67,41 @@ describe("retry policy", () => {
       /fetch failed/,
     );
     expect(seen).toEqual(["POST"]);
+  });
+
+  for (const method of ["POST", "PUT", "DELETE", "PATCH"] as const) {
+    it(`${method} network error carries the unknown-outcome hint, same error type as 5xx`, async () => {
+      const { client, seen } = clientWith([networkError, ok()]);
+      const err = await client.request(method, "/public/x", { body: {} }).catch((e) => e);
+      expect(err).toBeInstanceOf(BitwardenApiError);
+      expect(String(err)).toMatch(/fetch failed/);
+      expect(String(err)).toMatch(/may or may not have been applied/);
+      expect(isOutcomeUnknown(err)).toBe(true);
+      expect(seen).toEqual([method]);
+    });
+  }
+
+  it("a 5xx on a write is also flagged as outcome unknown; a 4xx is not", async () => {
+    const five = await clientWith([status(503)])
+      .client.request("PUT", "/public/x", { body: {} })
+      .catch((e) => e);
+    expect(isOutcomeUnknown(five)).toBe(true);
+    const four = await clientWith([status(400)])
+      .client.request("PUT", "/public/x", { body: {} })
+      .catch((e) => e);
+    expect(isOutcomeUnknown(four)).toBe(false);
+  });
+
+  it("network error text on a write is scrubbed in the tool error", async () => {
+    const leaky = () => {
+      throw new TypeError("connect failed client_secret=SUPERSECRET123");
+    };
+    const err = await clientWith([leaky])
+      .client.request("POST", "/public/x", { body: {} })
+      .catch((e) => e);
+    const text = (asToolError(err).content[0] as { text: string }).text;
+    expect(text).toMatch(/may or may not have been applied/);
+    expect(text).not.toContain("SUPERSECRET123");
   });
 
   it("retries 429 for POST (the request was not processed)", async () => {

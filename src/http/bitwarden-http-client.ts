@@ -29,6 +29,22 @@ const MAX_RETRY_AFTER_MS = 30_000;
 // already have been applied upstream. 429 is retried for every method.
 const IDEMPOTENT_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD"]);
 const defaultSleep: SleepFn = (ms) => new Promise((r) => setTimeout(r, ms));
+const UNKNOWN_OUTCOME_HINT =
+  "the request may or may not have been applied upstream; check the current state before repeating it";
+
+/** A write that failed with a 5xx or a network error/timeout: it may have been applied. */
+export function isOutcomeUnknown(err: unknown): boolean {
+  return err instanceof BitwardenApiError && err.message.includes(UNKNOWN_OUTCOME_HINT);
+}
+
+function unknownOutcome(method: string, err: BitwardenApiError): BitwardenApiError {
+  return new BitwardenApiError(
+    err.status,
+    err.code,
+    `${err.message} (${method} not retried: ${UNKNOWN_OUTCOME_HINT})`,
+    err.details,
+  );
+}
 
 export class BitwardenHttpClient {
   private readonly apiBase: string;
@@ -62,7 +78,13 @@ export class BitwardenHttpClient {
       try {
         res = await this.doFetch<T>(method, path, options, token);
       } catch (err) {
-        if (!idempotent || attempt >= maxRetries) throw err;
+        if (!idempotent) {
+          // No HTTP status: the request may have reached the server (timeout,
+          // connection reset after sending). Same type and hint as a 5xx.
+          const message = err instanceof Error ? err.message : String(err);
+          throw unknownOutcome(method, new BitwardenApiError(0, "network_error", message));
+        }
+        if (attempt >= maxRetries) throw err;
         await this.sleep(1000 * 2 ** attempt);
         attempt++;
         continue;
@@ -84,14 +106,7 @@ export class BitwardenHttpClient {
       const delay = this.computeRetryDelay(res.status, res.headers, attempt, idempotent);
       if (delay === null || attempt >= maxRetries) {
         const err = mapErrorResponse(res.status, res.body);
-        if (err && !idempotent && res.status >= 500) {
-          throw new BitwardenApiError(
-            err.status,
-            err.code,
-            `${err.message} (${method} not retried: the request may or may not have been applied upstream; check the current state before repeating it)`,
-            err.details,
-          );
-        }
+        if (err && !idempotent && res.status >= 500) throw unknownOutcome(method, err);
         if (err) throw err;
         return res;
       }

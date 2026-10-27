@@ -15,6 +15,7 @@ coverage/
 .remember/
 docs/superpowers/
 docs/internal/
+docs/audit/
 
 # OS / editor
 .DS_Store

@@ -12,6 +12,7 @@ change that fixes it.
 - [unbounded-response-buffering] Response bodies are read and returned in full with no size limit, including upstream error bodies in tool errors.
 - [stdio-10mib-silent-exit, stdio-10mib-kills-server, prod-stdio-10mib-exit] An incoming stdio line over 10 MiB (SDK limit) ends the process without a response or own log line; documented in README, not handled.
 - [epipe-crash-on-shutdown] An EPIPE on stdout when the client disconnects during an in-flight tool call is not handled.
+- [get-retry-total-duration] A GET that times out is retried, so one call can take about 4 x `HTTP_TIMEOUT_MS` plus backoff, which may exceed a gateway or client tool timeout.
 - [dotenv-cwd-merge-and-stdout, dotenv-cwd-merge] `import "dotenv/config"` also loads a `.env` from the working directory on top of `--env-file` (fills unset variables; documented in README); its debug output would go to stdout.
 
 ## Secrets Manager
@@ -27,11 +28,12 @@ change that fixes it.
 
 ## Tools and schemas
 
-- [member-schema-drift] `bw_member_invite` / `bw_member_update` still allow member type 3 (removed upstream), cannot set `permissions` for Custom members, and do not expose the newer `email` / `name` update fields (needs a contract fixture update).
+- [member-schema-drift] Minor: the harmful part (wiping state on update) is fixed in 0.2.0; what remains is a feature gap. `bw_member_invite` / `bw_member_update` still accept the legacy member type 3 (removed upstream), do not expose `permissions` for Custom members on invite, and do not expose the newer `email` / `name` update fields; changing the schema needs a contract fixture update.
 - [import-policy-missing-fields] `bw_org_import` lacks `inviteUsersAfterProvisioning` and requires email on deleted members; `bw_policy_set` lacks metadata.
 - [pagination-not-resumable, pagination-token-not-resumable] List tools return a `continuationToken` that no tool accepts, and the oversize note suggests paging with it; truncation at `PAGINATION_MAX_ITEMS` drops the token.
 - [no-input-size-limits] Tool inputs are not validated against the schema or bounded (array lengths, string lengths).
 - [license-get-description-overclaims] `bw_license_subscription_get` description promises plan, billing period and seats used, which the endpoint does not return.
+- [license-delta-lost-update] The `bw_license_*_update` tools read the current total and send current + delta (read-modify-write); two concurrent updates can lose one of them.
 - [placeholder-annotations-flip] Stub and placeholder write tools are annotated read-only and have no `confirm` property; configuring Secrets Manager later changes their annotations and schema.
 - [generated-tools-empty-and-latent-bugs] The raw-tool generator misclassifies sub-resource GETs as paged lists; not reachable while the shipped spec is empty.
 
@@ -49,6 +51,7 @@ change that fixes it.
 - [confirm-gate-registry-test-missing] No registry-wide test that every write tool is wrapped by the confirm gate.
 - [sdk-and-wiring-untested] The Secrets Manager SDK loader (`tryLoadSmSdk`) has no unit test.
 - [no-stdio-e2e-and-version] CI does not start the built `dist/index.js` over stdio; that path is covered by `scripts/container-smoke.sh`, run by hand.
+- [stdio-probe-env-not-passed] `scripts/stdio-probe.mjs` in 2026-07-28 mode does not pass the environment to the spawned server.
 - [entrypoint-test-temp-dir-leak] `tests/entrypoint.test.ts` creates a `bwmcp-bin-*` temp dir with a symlink on each run and never removes it; clean it up in a `finally` or `afterAll`.
 
 ## Docs

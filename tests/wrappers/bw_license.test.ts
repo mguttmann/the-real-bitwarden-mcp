@@ -1,4 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
+import { BitwardenHttpClient } from "../../src/http/bitwarden-http-client.js";
 import {
   makeLicenseSubscriptionGetTool,
   makeLicenseSeatsUpdateTool,
@@ -167,5 +170,99 @@ describe("bw_license_* update tools send absolute totals", () => {
     for (const c of cases) {
       expect(c.make(fakeApi({}).client).description).not.toMatch(/Adjustment:/);
     }
+  });
+});
+
+// Unknown-outcome paths against the real HTTP client and a local mock server
+// (127.0.0.1, OS-assigned port). The tools take deltas, so a blind retry after
+// an unknown outcome could apply the delta twice.
+describe("bw_license_* update tools when the outcome is unknown", () => {
+  type Handler = (req: IncomingMessage, res: ServerResponse) => void;
+  let server: Server;
+  let handler: Handler = () => {};
+  const seen: string[] = [];
+
+  beforeAll(async () => {
+    server = createServer((req, res) => {
+      seen.push(req.method ?? "");
+      req.resume();
+      req.on("end", () => handler(req, res));
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  });
+
+  afterAll(async () => {
+    server.closeAllConnections();
+    await new Promise((r) => server.close(r));
+  });
+
+  function realClient(timeoutMs = 2000) {
+    seen.length = 0;
+    return new BitwardenHttpClient({
+      apiBase: `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`,
+      tokenCache: { getToken: async () => "FAKE-TOKEN-1", invalidate: () => {} } as never,
+      timeoutMs,
+      sleep: async () => {},
+    });
+  }
+
+  const json = (res: ServerResponse, status: number, body: unknown) => {
+    res.writeHead(status, { "content-type": "application/json" });
+    res.end(JSON.stringify(body));
+  };
+
+  it("PUT timeout: error tells the caller to check bw_license_subscription_get first", async () => {
+    handler = (req, res) => {
+      if (req.method === "GET") return json(res, 200, baseSub);
+      // Answer the PUT only after the client timeout has fired.
+      setTimeout(() => {
+        if (!res.destroyed) json(res, 200, { message: "ok" });
+      }, 500);
+    };
+    const res = await makeLicenseSeatsUpdateTool(realClient(100)).handler({ seatAdjustment: 5 });
+    expect(res.isError).toBe(true);
+    const text = textOf(res);
+    expect(text).toMatch(/network_error.*request timeout/);
+    expect(text).toMatch(/may or may not have been applied/);
+    expect(text).toMatch(/bw_license_subscription_get/);
+    expect(text).toMatch(/before retrying/);
+    expect(seen).toEqual(["GET", "PUT"]);
+  });
+
+  it("PUT 503: error tells the caller to check bw_license_subscription_get first", async () => {
+    handler = (req, res) =>
+      req.method === "GET" ? json(res, 200, baseSub) : json(res, 503, "Service Unavailable");
+    const res = await makeLicenseSeatsUpdateTool(realClient()).handler({ seatAdjustment: 5 });
+    expect(res.isError).toBe(true);
+    expect(textOf(res)).toMatch(/bw_license_subscription_get/);
+    expect(seen).toEqual(["GET", "PUT"]);
+  });
+
+  it("PUT 200 then read-back 503: says the PUT succeeded and the read-back failed", async () => {
+    let gets = 0;
+    handler = (req, res) => {
+      if (req.method === "PUT") return json(res, 200, { message: "ok" });
+      gets++;
+      return gets === 1 ? json(res, 200, baseSub) : json(res, 503, "Service Unavailable");
+    };
+    const res = await makeLicenseSeatsUpdateTool(realClient()).handler({ seatAdjustment: 5 });
+    expect(res.isError).toBe(true);
+    const text = textOf(res);
+    expect(text).toMatch(/PUT .*answered successfully/);
+    expect(text).toMatch(/read-back .*failed/i);
+    expect(text).toMatch(/bw_license_subscription_get before retrying/);
+    expect(text).toMatch(/503/);
+    // Exactly one PUT: no automatic retry of the write.
+    expect(seen.filter((m) => m === "PUT")).toHaveLength(1);
+  });
+
+  it("a 4xx on the PUT is a plain error without the retry warning", async () => {
+    handler = (req, res) =>
+      req.method === "GET"
+        ? json(res, 200, baseSub)
+        : json(res, 400, { Message: "The request's model state is invalid." });
+    const res = await makeLicenseSeatsUpdateTool(realClient()).handler({ seatAdjustment: 5 });
+    expect(res.isError).toBe(true);
+    expect(textOf(res)).not.toMatch(/bw_license_subscription_get/);
   });
 });
