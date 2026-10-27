@@ -22,6 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `bw_org_import`: inside a `members` item only `externalId` is required
   now; `email` may be left out for a member with `deleted: true`, as the
   API allows. The tool's top-level required list is unchanged.
+- Successful tool output larger than `BW_MCP_MAX_RESPONSE_BYTES` (new,
+  optional, default 1048576 bytes) is cut instead of returned in full. The
+  output stays valid JSON: the leading items of its largest list plus a
+  `responseTruncated` object with the sizes and a hint on how to narrow or
+  page the query; a `continuationToken` next to a cut list is removed.
+  Output without a list is replaced by the `responseTruncated` object
+  alone. Results below the budget are unchanged.
+- Tool calls with a string argument longer than 102400 bytes or an array
+  with more than 10000 items (anywhere in the arguments, for example
+  `bw_org_import` members or groups) are rejected with an error before
+  anything is sent or previewed.
+- After 3 consecutive failed token requests of one client
+  (self-host, cloud, Secrets Manager REST, Secrets Manager SDK login), new
+  token requests pause for 30 s; calls during the pause fail at once with
+  `identity backoff: ... retry after N s`. A success resets the count.
 
 ### Changed
 

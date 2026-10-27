@@ -56,6 +56,7 @@ function config(withSm: boolean): Config {
     paginationMaxItems: 1000,
     paginationMaxPages: 20,
     maxListResponseBytes: 60_000,
+    maxResponseBytes: 1_048_576,
   };
 }
 

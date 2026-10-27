@@ -2,6 +2,7 @@
 // Falls back gracefully when the binary isn't available for the current platform.
 
 import { UNKNOWN_OUTCOME_HINT } from "./bitwarden-http-client.js";
+import { TokenBackoff } from "./token-backoff.js";
 
 type SdkProjectResponse = {
   id: string;
@@ -54,6 +55,8 @@ type SmSdkInit = {
   identityUrl: string;
   /** Deadline for the login and for each SDK call (HTTP_TIMEOUT_MS). */
   timeoutMs: number;
+  /** Clock for the login backoff (tests). */
+  now?: () => number;
 };
 
 export type SmSdkLoadError = {
@@ -121,10 +124,13 @@ export async function tryLoadSmSdk(
   const ms = init.timeoutMs;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let session: Promise<any> | undefined;
+  // The SDK login is this client's token request: same pause as OAuthTokenCache.
+  const backoff = new TokenBackoff(init.now);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function loggedIn(): Promise<any> {
     if (session) return session;
     const attempt = (async () => {
+      backoff.check();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let rawClient: any;
       const login = (async () => {
@@ -140,11 +146,17 @@ export async function tryLoadSmSdk(
           `Secrets Manager SDK login failed: ${msg}. Check BWS_ACCESS_TOKEN, BWS_API_BASE and BWS_IDENTITY_URL; the next call retries the login.`,
         );
       });
-      await withTimeout(
-        login,
-        ms,
-        `Secrets Manager SDK login timed out after ${ms} ms; the next call retries the login.`,
-      );
+      try {
+        await withTimeout(
+          login,
+          ms,
+          `Secrets Manager SDK login timed out after ${ms} ms; the next call retries the login.`,
+        );
+      } catch (err) {
+        backoff.failure(err);
+        throw err;
+      }
+      backoff.success();
       return rawClient;
     })();
     session = attempt;

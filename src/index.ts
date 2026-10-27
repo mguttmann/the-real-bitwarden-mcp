@@ -11,7 +11,7 @@ import { BitwardenHttpClient } from "./http/bitwarden-http-client.js";
 import { OAuthTokenCache } from "./http/oauth-token-cache.js";
 import { SmHttpClient } from "./http/sm-client.js";
 import { tryLoadSmSdk, type SmSdkClient, type SmSdkLoadError } from "./http/sm-sdk-client.js";
-import { createMcpServer } from "./server.js";
+import { createMcpServer, type McpServerOptions } from "./server.js";
 import { ToolRegistry } from "./tools/registry.js";
 import { withConfirmGuard, withReadOnly } from "./tools/confirm.js";
 import { makeRawRequestTool } from "./tools/raw_request.js";
@@ -318,8 +318,9 @@ export function startStdio(
   registry: ToolRegistry,
   logger: Logger,
   transport?: Transport,
+  options: McpServerOptions = {},
 ): StdioServerHandle {
-  return serveStdio(() => createMcpServer(registry, logger), {
+  return serveStdio(() => createMcpServer(registry, logger, options), {
     legacy: "serve",
     ...(transport ? { transport } : {}),
     onerror: (err) => reportStdioError(logger, err),
@@ -363,7 +364,7 @@ async function main(): Promise<void> {
   if (clients.smSdkError) reportSmSdkError(logger, clients.smSdkError);
 
   const registry = buildRegistry(config, clients);
-  startStdio(registry, logger);
+  startStdio(registry, logger, undefined, { maxResponseBytes: config.maxResponseBytes });
   logger.info({ tools: registry.size() }, "the-real-bitwarden-mcp ready");
 }
 

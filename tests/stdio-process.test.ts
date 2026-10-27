@@ -130,4 +130,42 @@ describe("stdio process", () => {
     expect(res.stderr).not.toMatch(/ready/);
     expect(res.stderr).not.toMatch(/injected env/);
   }, 30_000);
+
+  it("BW_MCP_MAX_RESPONSE_BYTES reaches tools/call: a larger result comes back cut", async () => {
+    const cwd = tempDir();
+    const envFile = join(cwd, "server.env");
+    writeFileSync(envFile, [...selfhost, "BW_MCP_MAX_RESPONSE_BYTES=600"].join("\n") + "\n");
+    const res = await run([`--env-file=${envFile}`], {
+      cwd,
+      env: cleanEnv(),
+      lines: [
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            capabilities: {},
+            clientInfo: { name: "t", version: "0" },
+          },
+        }),
+        JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/call",
+          params: { name: "bw_help", arguments: {} },
+        }),
+      ],
+      holdMs: 3000,
+    });
+    const reply = res.stdout
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as { id?: number; result?: { content: { text: string }[] } })
+      .find((m) => m.id === 2);
+    const text = reply!.result!.content[0]!.text;
+    expect(Buffer.byteLength(text)).toBeLessThanOrEqual(600);
+    expect(JSON.parse(text)).toHaveProperty("responseTruncated.limitBytes", 600);
+  }, 30_000);
 });

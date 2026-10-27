@@ -115,6 +115,13 @@
           "format": "string",
           "default": "warn",
           "choices": ["debug", "info", "warn", "error"]
+        },
+        {
+          "name": "BW_MCP_MAX_RESPONSE_BYTES",
+          "description": "Successful tool output above this many bytes is cut to valid JSON with a responseTruncated marker that says how to narrow or page the query.",
+          "isRequired": false,
+          "format": "number",
+          "default": "1048576"
         }
       ]
     }

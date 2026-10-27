@@ -1,3 +1,5 @@
+import { TokenBackoff } from "./token-backoff.js";
+
 export type OAuthTokenCacheOptions = {
   tokenUrl: string;
   clientId: string;
@@ -31,6 +33,7 @@ export class OAuthTokenCache {
   // a token that lives no longer than the buffer is still reused.
   private cached: { token: string; expiresAt: number; bufferMs: number } | undefined;
   private inFlight: Promise<string> | undefined;
+  private readonly backoff: TokenBackoff;
 
   constructor(opts: OAuthTokenCacheOptions) {
     this.tokenUrl = opts.tokenUrl;
@@ -41,6 +44,7 @@ export class OAuthTokenCache {
     this.now = opts.now ?? Date.now;
     this.expiryBufferMs = opts.expiryBufferMs ?? DEFAULT_BUFFER_MS;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.backoff = new TokenBackoff(this.now);
   }
 
   invalidate(): void {
@@ -53,9 +57,21 @@ export class OAuthTokenCache {
       return c.token;
     }
     if (this.inFlight) return this.inFlight;
-    this.inFlight = this.fetchToken().finally(() => {
-      this.inFlight = undefined;
-    });
+    this.backoff.check();
+    this.inFlight = this.fetchToken()
+      .then(
+        (token) => {
+          this.backoff.success();
+          return token;
+        },
+        (err: unknown) => {
+          this.backoff.failure(err);
+          throw err;
+        },
+      )
+      .finally(() => {
+        this.inFlight = undefined;
+      });
     return this.inFlight;
   }
 

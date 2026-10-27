@@ -103,8 +103,10 @@ binary set `REQUIRE_SDK=0`. `node scripts/stdio-probe.mjs <repoDir>
    confirm preview shows the effective request.
 3. List tools should return a slim projection by default and accept
    `include: ["all"]` to opt in to nested fields. Use the
-   `maybeNoteOversize()` helper from `_helpers.ts` to warn (not
-   truncate) on oversized payloads.
+   `maybeNoteOversize()` helper from `_helpers.ts` to warn on oversized
+   payloads. Do not cut output in the tool: `tools/call` cuts every
+   successful result over `BW_MCP_MAX_RESPONSE_BYTES` and rejects
+   oversized arguments (`src/limits.ts`).
 4. Register the tool in `src/index.ts → buildRegistry()`.
 5. Write a unit test next to the existing tests for that resource
    (`tests/wrappers/`). `fakeApi()` in `tests/helpers.ts` is a stand-in

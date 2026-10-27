@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import dotenv from "dotenv";
+import { DEFAULT_MAX_RESPONSE_BYTES } from "./limits.js";
 
 // A started-with `--env-file` process takes its environment from that file
 // only: a `.env` in the working directory (often the client's or gateway's)
@@ -73,6 +74,8 @@ export type Config = {
   paginationMaxItems: number;
   paginationMaxPages: number;
   maxListResponseBytes: number;
+  /** BW_MCP_MAX_RESPONSE_BYTES: successful tool output above this is cut. */
+  maxResponseBytes: number;
 };
 
 const DEFAULTS = {
@@ -82,6 +85,7 @@ const DEFAULTS = {
   paginationMaxItems: 1000,
   paginationMaxPages: 20,
   maxListResponseBytes: 60_000,
+  maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
 } as const;
 
 function parseBool(value: string | undefined, fallback: boolean): boolean {
@@ -252,5 +256,6 @@ export function loadConfig(env: Env = process.env): Config {
       env.BW_MCP_MAX_LIST_RESPONSE_BYTES,
       DEFAULTS.maxListResponseBytes,
     ),
+    maxResponseBytes: parsePositiveInt(env.BW_MCP_MAX_RESPONSE_BYTES, DEFAULTS.maxResponseBytes),
   };
 }

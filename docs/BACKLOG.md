@@ -8,9 +8,8 @@ change that fixes it.
 ## HTTP, tokens and transport
 
 - [read-only-on-off-values] `BITWARDEN_READ_ONLY=off` (or a value of only spaces) turns read-only mode on, because unrecognised values fail safe and `parseBool` does not know on/off.
+- [response-body-read-in-full] Since 0.3.0 successful tool output is cut to `BW_MCP_MAX_RESPONSE_BYTES`, but the upstream body is still read and parsed in full first, so a very large upstream response costs memory before the cut (follow-up of the audit item unbounded-response-buffering).
 - [pagination-exact-limit-truncated] When a page ends exactly at `PAGINATION_MAX_ITEMS` and the API still returns a token, the list reports `truncated: true` even if the next page would be empty.
-- [token-cache-edge-cases] Failed token requests are neither cached nor backed off, so every call during an identity outage or with bad credentials sends a new token request (the short-lifetime half was fixed in 0.2.0). Kept: a backoff turns a recovered identity server into errors for a chosen time and needs a chosen policy (owner decision).
-- [unbounded-response-buffering] Successful response bodies are read and returned in full with no byte limit (upstream error texts are cut since 0.2.0). Kept: a limit changes successful tool output for large results and needs a chosen byte budget (owner decision).
 
 ## Secrets Manager
 
@@ -22,7 +21,6 @@ change that fixes it.
 ## Tools and schemas
 
 - [member-update-permissions] `bw_member_update` keeps a Custom member's current permissions but cannot set new ones (only `bw_member_invite` got `permissions` in 0.3.0); changing the flags needs `bw_raw_request`. The Public API accepts `permissions` on PUT.
-- [no-input-size-limits] Tool inputs are not validated against the schema or bounded (array lengths, string lengths). Kept: validation and bounds reject calls that work today and need chosen limits (owner decision).
 - [license-delta-lost-update] The `bw_license_*_update` tools are read-modify-write; calls in one process are serialized since 0.2.0, but separate server processes can still lose an update. Kept: the API has no conditional update (upstream).
 - [placeholder-annotations-flip] Stub and placeholder write tools are annotated read-only and have no `confirm` property; configuring Secrets Manager later changes their annotations and schema. Kept: changes the tool contract (placeholders are pinned with no properties).
 

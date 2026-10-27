@@ -279,6 +279,7 @@ boolean variables fall back to the default.
 | `PAGINATION_MAX_ITEMS`             |                         | default 1000                                                                 |
 | `PAGINATION_MAX_PAGES`             |                         | default 20                                                                   |
 | `BW_MCP_MAX_LIST_RESPONSE_BYTES`   |                         | default 60000; adds a `note` warning to list responses that exceed this size |
+| `BW_MCP_MAX_RESPONSE_BYTES`        |                         | default 1048576; successful tool output above this size is cut (see Limits)  |
 
 ### Mode matrix
 
@@ -375,7 +376,34 @@ For per-item details, use the dedicated detail endpoints
 
 A response-size guard adds a `note` field to any list response that exceeds
 `BW_MCP_MAX_LIST_RESPONSE_BYTES` characters (default in the table above). The
-response is still returned in full; nothing is truncated silently.
+note is a hint only; a response that also exceeds `BW_MCP_MAX_RESPONSE_BYTES`
+is cut as described under Limits, and the note stays in the cut response.
+
+## Limits
+
+The values live in `src/limits.ts`; `tests/docs-numbers.test.ts` holds this
+section to them.
+
+- **Response size.** A successful tool result larger than
+  `BW_MCP_MAX_RESPONSE_BYTES` (bytes, default 1048576) is cut, never
+  failed. The result stays valid JSON: the leading items of its largest list
+  are kept, together with a `responseTruncated` object (`originalBytes`,
+  `limitBytes`, `cutArray`, `keptItems`, `totalItems` and a `hint` on how to
+  narrow or page the query). A `continuationToken` next to a cut list is
+  removed (`continuationTokenRemoved: true`), because it would resume after
+  the items that were cut. Output without a list (for example a preview) is
+  replaced by the `responseTruncated` object alone. Error results are not
+  cut here; upstream error texts are shortened separately.
+- **Input size.** A tool call is rejected before anything is sent when any
+  string in its arguments is longer than 102400 bytes (100 KiB) or any array
+  has more than 10000 items (for example `bw_org_import` with more than 10000
+  members or groups). The error names the parameter path and the size,
+  never the value.
+- **Token backoff.** After 3 consecutive failed token requests of one client
+  (self-host, cloud, Secrets Manager REST, and the Secrets Manager SDK login)
+  new token requests pause for 30 s. Calls during the pause fail at once
+  with `identity backoff: ... retry after N s`; a success resets the count,
+  and a failure right after a pause starts the next one.
 
 ## Running
 

@@ -90,6 +90,11 @@ Out of scope:
 - `BITWARDEN_READ_ONLY=true` (opt-in) makes every write tool refuse to
   run and limits `bw_raw_request` to GET; an unrecognised value turns it
   on.
+- Size and rate limits (`src/limits.ts`, values in README, Limits): tool
+  arguments over the input bounds are rejected before anything is sent,
+  successful output over `BW_MCP_MAX_RESPONSE_BYTES` is cut to valid JSON
+  with a marker, and token requests of a client pause after repeated
+  failures.
 - One scrubber (`src/redact.ts`) is used for logs and for every error
   text returned to the MCP client: the keys listed in `SENSITIVE_KEYS`
   are removed at any depth (case-insensitive, also in arrays, error

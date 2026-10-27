@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { tryLoadSmSdk } from "../src/http/sm-sdk-client.js";
+import { TOKEN_BACKOFF_FAILURES, TOKEN_BACKOFF_MS } from "../src/limits.js";
 
 // A fake @bitwarden/sdk-napi module. No native binary, no network.
 type FakeOpts = {
@@ -113,5 +114,37 @@ describe("tryLoadSmSdk", () => {
     const result = { data: [{ id: "s1", error: null }] };
     const client = await load(fakeModule({ secretDelete: async () => result }));
     await expect(client.secretDelete("s1")).resolves.toEqual(result);
+  });
+
+  it("pauses SDK logins after repeated failures; a success after the pause resets", async () => {
+    let t = 5_000_000;
+    let fail = true;
+    const fake = fakeModule({
+      login: async () => {
+        if (fail) throw new Error("invalid_client");
+      },
+    });
+    const loaded = await tryLoadSmSdk({ ...init, now: () => t }, async () => fake.mod);
+    if (!loaded.ok) throw new Error("load failed");
+    const client = loaded.client;
+    for (let i = 0; i < TOKEN_BACKOFF_FAILURES; i++) {
+      await expect(client.projectList("org-1")).rejects.toThrow(/SDK login failed/);
+    }
+    await expect(client.projectList("org-1")).rejects.toThrow(
+      new RegExp(`identity backoff: .*retry after ${TOKEN_BACKOFF_MS / 1000} s`),
+    );
+    expect(fake.login).toHaveBeenCalledTimes(TOKEN_BACKOFF_FAILURES);
+    t += TOKEN_BACKOFF_MS;
+    fail = false;
+    await expect(client.projectList("org-1")).resolves.toEqual([]);
+    expect(fake.login).toHaveBeenCalledTimes(TOKEN_BACKOFF_FAILURES + 1);
+  });
+
+  it("counts a timed-out SDK login as a failure", async () => {
+    const client = await load(fakeModule({ login: never }));
+    for (let i = 0; i < TOKEN_BACKOFF_FAILURES; i++) {
+      await expect(client.projectList("org-1")).rejects.toThrow(/login timed out/);
+    }
+    await expect(client.projectList("org-1")).rejects.toThrow(/identity backoff/);
   });
 });

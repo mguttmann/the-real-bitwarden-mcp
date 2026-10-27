@@ -20,6 +20,7 @@ function emptyConfig(overrides: Partial<Config>): Config {
     paginationMaxItems: 100,
     paginationMaxPages: 5,
     maxListResponseBytes: 60000,
+    maxResponseBytes: 1_048_576,
     ...overrides,
   };
 }

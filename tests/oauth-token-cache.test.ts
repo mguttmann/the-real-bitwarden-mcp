@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { OAuthTokenCache } from "../src/http/oauth-token-cache.js";
 import { buildClients } from "../src/index.js";
 import type { Config } from "../src/config.js";
+import { TOKEN_BACKOFF_FAILURES, TOKEN_BACKOFF_MS } from "../src/limits.js";
 
 /** A fetch that never answers but rejects when its signal aborts, like undici. */
 function hangingFetch() {
@@ -304,5 +305,132 @@ describe("OAuthTokenCache", () => {
     expect(err.message).toBe(
       "OAuth token response has an access_token that is not a valid header value",
     );
+  });
+});
+
+describe("token backoff", () => {
+  const failing = () => new Response("", { status: 503 });
+  const ok = () =>
+    new Response(JSON.stringify({ access_token: "FAKE-TOKEN-1", expires_in: 3600 }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+
+  function cacheWith(responses: (() => Response)[]) {
+    let t = 1_000_000;
+    const queue = [...responses];
+    const fetchImpl = vi.fn(async () => {
+      const next = queue.shift();
+      if (!next) throw new Error("fetch sequence exhausted");
+      return next();
+    });
+    const cache = new OAuthTokenCache({
+      tokenUrl: "https://id.example.invalid/connect/token",
+      clientId: "organization.x",
+      clientSecret: "FAKE-SECRET-1",
+      scope: "api.organization",
+      fetch: fetchImpl,
+      now: () => t,
+    });
+    return { cache, fetchImpl, advance: (ms: number) => (t += ms) };
+  }
+
+  it(`pauses token requests for ${TOKEN_BACKOFF_MS / 1000} s after ${TOKEN_BACKOFF_FAILURES} consecutive failures`, async () => {
+    const { cache, fetchImpl, advance } = cacheWith([failing, failing, failing, ok]);
+    for (let i = 0; i < TOKEN_BACKOFF_FAILURES; i++) {
+      await expect(cache.getToken()).rejects.toThrow("OAuth token request failed: 503");
+    }
+    expect(fetchImpl).toHaveBeenCalledTimes(TOKEN_BACKOFF_FAILURES);
+    await expect(cache.getToken()).rejects.toThrow(
+      `identity backoff: the last ${TOKEN_BACKOFF_FAILURES} token requests failed (last: OAuth token request failed: 503); retry after ${TOKEN_BACKOFF_MS / 1000} s`,
+    );
+    advance(TOKEN_BACKOFF_MS - 1500);
+    await expect(cache.getToken()).rejects.toThrow(/retry after 2 s/);
+    expect(fetchImpl).toHaveBeenCalledTimes(TOKEN_BACKOFF_FAILURES);
+    advance(1500);
+    await expect(cache.getToken()).resolves.toBe("FAKE-TOKEN-1");
+    expect(fetchImpl).toHaveBeenCalledTimes(TOKEN_BACKOFF_FAILURES + 1);
+  });
+
+  it("a failure after the pause starts the next pause at once", async () => {
+    const { cache, fetchImpl, advance } = cacheWith([failing, failing, failing, failing]);
+    for (let i = 0; i < TOKEN_BACKOFF_FAILURES; i++) await cache.getToken().catch(() => {});
+    advance(TOKEN_BACKOFF_MS);
+    await expect(cache.getToken()).rejects.toThrow("OAuth token request failed: 503");
+    await expect(cache.getToken()).rejects.toThrow(/identity backoff/);
+    expect(fetchImpl).toHaveBeenCalledTimes(TOKEN_BACKOFF_FAILURES + 1);
+  });
+
+  it("a success resets the count of consecutive failures", async () => {
+    const seq = [
+      ...Array.from({ length: TOKEN_BACKOFF_FAILURES - 1 }, () => failing),
+      ok,
+      ...Array.from({ length: TOKEN_BACKOFF_FAILURES - 1 }, () => failing),
+      ok,
+    ];
+    const { cache, fetchImpl } = cacheWith(seq);
+    for (let i = 0; i < TOKEN_BACKOFF_FAILURES - 1; i++) await cache.getToken().catch(() => {});
+    await expect(cache.getToken()).resolves.toBe("FAKE-TOKEN-1");
+    cache.invalidate();
+    for (let i = 0; i < TOKEN_BACKOFF_FAILURES - 1; i++) await cache.getToken().catch(() => {});
+    await expect(cache.getToken()).resolves.toBe("FAKE-TOKEN-1");
+    expect(fetchImpl).toHaveBeenCalledTimes(seq.length);
+  });
+
+  it("concurrent callers sharing one failed request count as one failure", async () => {
+    const { cache, fetchImpl } = cacheWith([failing, failing, ok]);
+    await Promise.allSettled([cache.getToken(), cache.getToken(), cache.getToken()]);
+    await cache.getToken().catch(() => {});
+    await expect(cache.getToken()).resolves.toBe("FAKE-TOKEN-1");
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("counts a timed-out token request as a failure", async () => {
+    const cache = new OAuthTokenCache({
+      tokenUrl: "https://id.example.invalid/connect/token",
+      clientId: "organization.x",
+      clientSecret: "FAKE-SECRET-1",
+      scope: "api.organization",
+      fetch: hangingFetch(),
+      timeoutMs: 10,
+    });
+    for (let i = 0; i < TOKEN_BACKOFF_FAILURES; i++) {
+      await expect(cache.getToken()).rejects.toThrow(/timed out/);
+    }
+    await expect(cache.getToken()).rejects.toThrow(/identity backoff/);
+  });
+
+  it("is per client: a paused self-host client does not pause cloud", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL | Request) =>
+      String(url).startsWith("https://h.example.invalid") ? failing() : ok(),
+    );
+    const config = {
+      selfhost: {
+        apiBase: "https://h.example.invalid/api",
+        identityUrl: "https://h.example.invalid/identity",
+        clientId: "organization.x",
+        clientSecret: "FAKE-SECRET-1",
+      },
+      cloud: {
+        apiBase: "https://c.example.invalid",
+        identityUrl: "https://c.example.invalid/identity",
+        clientId: "organization.y",
+        clientSecret: "FAKE-SECRET-2",
+      },
+      sm: undefined,
+      httpTimeoutMs: 1000,
+    } as Config;
+    const clients = await buildClients(config, fetchImpl as typeof fetch);
+    for (let i = 0; i < TOKEN_BACKOFF_FAILURES; i++) {
+      await expect(clients.selfhost!.request("GET", "/public/members")).rejects.toThrow(/503/);
+    }
+    await expect(clients.selfhost!.request("GET", "/public/members")).rejects.toThrow(
+      /identity backoff/,
+    );
+    await expect(
+      clients.cloud!.request("GET", "/public/organization/subscription"),
+    ).resolves.toMatchObject({
+      status: 200,
+    });
   });
 });

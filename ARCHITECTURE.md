@@ -86,6 +86,13 @@ Neither the `bws` CLI nor `@bitwarden/sdk-napi` offer them.
 - **Slim list projections**: list tools strip nested fields by default
   and warn (not truncate) when the JSON exceeds
   `BW_MCP_MAX_LIST_RESPONSE_BYTES`. Use `include: ["all"]` to opt in.
+- **Limits** (`src/limits.ts`, applied in `tools/call` in
+  `src/server.ts`): arguments over the input bounds are rejected before
+  any handler runs; a successful result over `BW_MCP_MAX_RESPONSE_BYTES`
+  is cut to valid JSON with a `responseTruncated` marker. Token requests
+  of one client pause after repeated failures (`src/http/token-backoff.ts`,
+  used by `OAuthTokenCache` and the Secrets Manager SDK login). Values:
+  README, Limits.
 - **Host-locking** - `BitwardenHttpClient.buildUrl()` builds every URL
   as API base plus path, so paths cannot reach another host, even via
   `bw_raw_request`. `src/http/path-safety.ts` rejects dot segments and

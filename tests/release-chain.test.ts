@@ -222,6 +222,7 @@ describe("server.json", () => {
     expect(byName.get("BITWARDEN_CONFIRM_WRITES")?.default).toBe(String(cfg.confirmWrites));
     expect(byName.get("BITWARDEN_READ_ONLY")?.default).toBe(String(cfg.readOnly));
     expect(byName.get("LOG_LEVEL")?.default).toBe(cfg.logLevel);
+    expect(byName.get("BW_MCP_MAX_RESPONSE_BYTES")?.default).toBe(String(cfg.maxResponseBytes));
   });
 });
 

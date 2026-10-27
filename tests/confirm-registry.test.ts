@@ -99,6 +99,7 @@ function setup() {
     paginationMaxItems: 100,
     paginationMaxPages: 5,
     maxListResponseBytes: 60_000,
+    maxResponseBytes: 1_048_576,
   };
   return { registry: buildRegistry(config, clients), sent, sdk };
 }
