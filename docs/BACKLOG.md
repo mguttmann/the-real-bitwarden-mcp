@@ -31,6 +31,8 @@ change that fixes it.
 
 ## Release and repository (owner actions)
 
+- [release-recovery-recipes] RELEASING.md has no recipe for a tag pushed while `NPM_PUBLISH_ENABLED` was unset (publish jobs skipped, not failed) or for a half-created release; the release.yml error text says to push a new tag, which contradicts RELEASING.md.
+- [registry-dispatch-uses-main-server-json] A manual `mcp-registry.yml` run takes `server.json` from main and only the version from the tag, so a newer main can publish newer descriptions under an older version.
 - [pvr-disabled-but-security-md-points-to-it, repo-security-features-off, no-dependabot-no-repo-security-settings] SECURITY.md now names private vulnerability reporting as the channel; the owner enables it, together with secret scanning, push protection, Dependabot security updates, CodeQL and the branch/tag rulesets (docs/maintainers/repo-settings.md). Unverified from the repository; check with the `gh api` calls at the end of that file.
 - [npm-manual-publish-no-provenance] The npm trusted publisher is configured (2026-10-27) but unvalidated until the first workflow publish; `NPM_PUBLISH_ENABLED` is not set yet (docs/maintainers/repo-settings.md, section 5).
 - [diverged-lines-no-safe-deploy-target, no-ci-on-prod-branch] The deployed line is a separate branch without CI; move production to a tagged release from `main`.
