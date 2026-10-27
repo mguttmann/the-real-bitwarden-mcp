@@ -389,7 +389,9 @@ section to them.
   failed. The result stays valid JSON: the leading items of its largest list
   are kept, together with a `responseTruncated` object (`originalBytes`,
   `limitBytes`, `cutArray`, `keptItems`, `totalItems` and a `hint` on how to
-  narrow or page the query). A `continuationToken` next to a cut list is
+  narrow or page the query). A result whose root is a list becomes an
+  object: the kept items move to `items` next to `responseTruncated`. A
+  `continuationToken` next to a cut list is
   removed (`continuationTokenRemoved: true`), because it would resume after
   the items that were cut. Output without a list (for example a preview) is
   replaced by the `responseTruncated` object alone. Error results are not

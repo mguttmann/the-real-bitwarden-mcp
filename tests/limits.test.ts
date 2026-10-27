@@ -164,6 +164,10 @@ describe("response cut", () => {
     });
     expect(parsed.responseTruncated.hint).toMatch(/BW_MCP_MAX_RESPONSE_BYTES/);
     expect(parsed.responseTruncated.hint).toMatch(/narrow the query/i);
+    // Caller-side options come first; PAGINATION_MAX_ITEMS is an operator setting.
+    const hint = parsed.responseTruncated.hint as string;
+    expect(hint).toMatch(/operator/i);
+    expect(hint.indexOf("PAGINATION_MAX_ITEMS")).toBeGreaterThan(hint.indexOf("detail tool"));
     // One more item would not fit.
     const oneMore = { ...parsed, members: members.slice(0, parsed.members.length + 1) };
     oneMore.responseTruncated = {

@@ -81,8 +81,8 @@ export function inputBoundsViolation(input: unknown): string | undefined {
 const CUT_HINT =
   "The result was larger than the response budget (BW_MCP_MAX_RESPONSE_BYTES) and was cut. " +
   "Narrow the query (filters such as email_contains or name_contains, a shorter start/end " +
-  "window for events, fewer include fields), lower PAGINATION_MAX_ITEMS to page in smaller " +
-  "steps, or use a detail tool for single items.";
+  "window for events, fewer include fields) or use a detail tool for single items. " +
+  "An operator can also lower PAGINATION_MAX_ITEMS or raise BW_MCP_MAX_RESPONSE_BYTES.";
 
 type Marker = {
   originalBytes: number;

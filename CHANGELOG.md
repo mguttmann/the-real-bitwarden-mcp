@@ -35,8 +35,9 @@ required entry is renamed or removed (`tests/tool-contract.test.ts`).
   optional, default 1048576 bytes) is cut instead of returned in full. The
   output stays valid JSON: the leading items of its largest list plus a
   `responseTruncated` object with the sizes and a hint on how to narrow or
-  page the query; a `continuationToken` next to a cut list is removed.
-  Output without a list is replaced by the `responseTruncated` object
+  page the query; a `continuationToken` next to a cut list is removed. A
+  cut result whose root is a list becomes an object with the kept items
+  under `items`. Output without a list is replaced by the `responseTruncated` object
   alone. Results below the budget are unchanged.
 - Tool calls with a string argument longer than 102400 bytes or an array
   with more than 10000 items (anywhere in the arguments, for example
