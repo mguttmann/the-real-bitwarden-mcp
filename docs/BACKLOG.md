@@ -13,6 +13,9 @@ change that fixes it.
 - [stdio-10mib-silent-exit, stdio-10mib-kills-server, prod-stdio-10mib-exit] An incoming stdio line over 10 MiB (SDK limit) ends the process without a response or own log line; documented in README, not handled.
 - [epipe-crash-on-shutdown] An EPIPE on stdout when the client disconnects during an in-flight tool call is not handled.
 - [get-retry-total-duration] A GET that times out is retried, so one call can take about 4 x `HTTP_TIMEOUT_MS` plus backoff, which may exceed a gateway or client tool timeout.
+- [outcome-unknown-detection] `isOutcomeUnknown` detects the unknown-outcome case from the message text; a dedicated error field or code would be more robust.
+- [network-error-classification] Every `doFetch` failure on a write is reported as a possibly applied network error, also failures before anything was sent (for example an invalid URL); the warning errs on the safe side.
+- [network-error-cause-dropped] Write network errors keep only `err.message` (often "fetch failed"), not the underlying cause such as ECONNREFUSED.
 - [dotenv-cwd-merge-and-stdout, dotenv-cwd-merge] `import "dotenv/config"` also loads a `.env` from the working directory on top of `--env-file` (fills unset variables; documented in README); its debug output would go to stdout.
 
 ## Secrets Manager
@@ -28,6 +31,7 @@ change that fixes it.
 
 ## Tools and schemas
 
+- [license-readback-mismatch-hint] When the license read-back succeeds but differs from the requested total, the error does not tell the caller to check `bw_license_subscription_get` before adjusting again.
 - [member-schema-drift] Minor: the harmful part (wiping state on update) is fixed in 0.2.0; what remains is a feature gap. `bw_member_invite` / `bw_member_update` still accept the legacy member type 3 (removed upstream), do not expose `permissions` for Custom members on invite, and do not expose the newer `email` / `name` update fields; changing the schema needs a contract fixture update.
 - [import-policy-missing-fields] `bw_org_import` lacks `inviteUsersAfterProvisioning` and requires email on deleted members; `bw_policy_set` lacks metadata.
 - [pagination-not-resumable, pagination-token-not-resumable] List tools return a `continuationToken` that no tool accepts, and the oversize note suggests paging with it; truncation at `PAGINATION_MAX_ITEMS` drops the token.
