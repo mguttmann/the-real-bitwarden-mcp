@@ -7,11 +7,15 @@ change that fixes it.
 
 ## HTTP, tokens and transport
 
+- [read-only-on-off-values] `BITWARDEN_READ_ONLY=off` (or a value of only spaces) turns read-only mode on, because unrecognised values fail safe and `parseBool` does not know on/off.
+- [pagination-exact-limit-truncated] When a page ends exactly at `PAGINATION_MAX_ITEMS` and the API still returns a token, the list reports `truncated: true` even if the next page would be empty.
 - [token-cache-edge-cases] Failed token requests are neither cached nor backed off, so every call during an identity outage or with bad credentials sends a new token request (the short-lifetime half was fixed in 0.2.0). Kept: a backoff turns a recovered identity server into errors for a chosen time and needs a chosen policy (owner decision).
 - [unbounded-response-buffering] Successful response bodies are read and returned in full with no byte limit (upstream error texts are cut since 0.2.0). Kept: a limit changes successful tool output for large results and needs a chosen byte budget (owner decision).
 
 ## Secrets Manager
 
+- [sm-call-total-duration] Login and SDK call have separate deadlines, so the first `bws_*` call can take about 2 x `HTTP_TIMEOUT_MS` (about 3 x for `bws_secret_update` without `note`/`projectIds`), possibly above a gateway tool timeout.
+- [sm-login-timeout-overlap] A login that runs into its deadline is not cancelled; the next call starts a second login while the first may still run in the background.
 - [completeness-gaps-unverified] Unverified: SDK access token renewal in long-running processes (the SDK client from the lazy login is reused for the life of the process; whether `@bitwarden/sdk-napi` renews its token is not checked). The Owner role half was checked against bitwarden/server in 0.2.0.
 - [sdk-napi-stale-no-arm64] `@bitwarden/sdk-napi` is still 1.0.0 with no linux-arm64 binary; watch upstream for a new release. Kept: upstream action (npm still lists 1.0.0 as latest, checked 2026-10-27).
 
