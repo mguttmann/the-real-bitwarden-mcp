@@ -7,6 +7,12 @@ applies them once, in the web UI or with the `gh api` calls shown.
 `tests/release-chain.test.ts` fails when a job is added to `ci.yml`
 without being listed in the required checks below.
 
+State on 2026-10-27, read with the calls in "Check the result": both
+rulesets (`main`, `release-tags`) are active, workflow permissions are
+read-only, private vulnerability reporting, Dependabot alerts and
+security updates, secret scanning with push protection and the CodeQL
+default setup are on, and `NPM_PUBLISH_ENABLED` is `true`.
+
 ## 1. Ruleset for `main`
 
 Settings > Rules > Rulesets > New branch ruleset.
@@ -109,13 +115,10 @@ gh api -X PUT repos/{owner}/{repo}/automated-security-fixes
 
 ## 5. npm publishing
 
-State on 2026-10-27: the package `the-real-bitwarden-mcp` exists on npm
-(0.1.0 and 0.1.1, published by hand without provenance), and the owner
-configured the trusted publisher for this repository and workflow
-`release.yml` on 2026-10-27. The trusted publisher is validated only by
-the first workflow publish: set `NPM_PUBLISH_ENABLED` to `true` before
-pushing the next release tag and check that the `npm-publish` job
-succeeds and the version on npmjs.com shows a provenance statement.
+State on 2026-10-27: 0.1.0 and 0.1.1 were published by hand without
+provenance. The owner configured the trusted publisher for this
+repository and workflow `release.yml`, and 0.2.0 and 0.2.1 were
+published by the workflow with provenance.
 
 The workflow publishes only when both are done:
 
@@ -124,7 +127,7 @@ The workflow publishes only when both are done:
   `the-real-bitwarden-mcp`, workflow file `release.yml`, environment
   empty (the `npm-publish` job declares none) (done).
 - In the GitHub repository, Settings > Secrets and variables > Actions >
-  Variables: `NPM_PUBLISH_ENABLED` is `true`.
+  Variables: `NPM_PUBLISH_ENABLED` is `true` (done).
 
 The `npm-publish` job then publishes the tarball the `build` job packed,
 after the GitHub release exists, with provenance through OIDC. It needs
@@ -133,9 +136,9 @@ publishing requires, and that the tarball matches `SHA256SUMS`.
 Provenance requires the repository to stay public. With the variable
 off, `npm-publish` and the `mcp-registry` job after it are skipped.
 
-If the first workflow publish fails after the GitHub release exists,
-recover as described in [RELEASING.md](../../RELEASING.md): "Re-run
-failed jobs" on the same run, not "Re-run all jobs" and not a new tag.
+If a workflow publish fails after the GitHub release exists, or a tag
+was pushed while the variable was off, recover as described in
+[RELEASING.md](../../RELEASING.md), "Recovering a release".
 
 Optionally, after the first publish through the workflow, disallow
 token-based publishing in the npm package settings so only the workflow
@@ -197,4 +200,8 @@ gh api repos/{owner}/{repo}/rulesets
 gh api repos/{owner}/{repo}/actions/permissions/workflow
 gh api repos/{owner}/{repo}/private-vulnerability-reporting
 gh api repos/{owner}/{repo}/vulnerability-alerts   # 204 when on
+gh api repos/{owner}/{repo}/automated-security-fixes
+gh api repos/{owner}/{repo} --jq .security_and_analysis
+gh api repos/{owner}/{repo}/code-scanning/default-setup --jq .state
+gh api repos/{owner}/{repo}/actions/variables/NPM_PUBLISH_ENABLED
 ```

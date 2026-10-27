@@ -58,8 +58,12 @@ binaries for common platforms but may be missing on yours.
 the server still starts. SM tools then return a clear "SDK not
 available" error per call instead of crashing the process. The SDK
 login runs on the first SDK call, not at startup, so `initialize` never
-waits for the identity server; login and calls are bounded by
-`HTTP_TIMEOUT_MS`, and a failed login is retried by the next call. Machine
+waits for the identity server. One `HTTP_TIMEOUT_MS` deadline covers a
+whole SDK client method: the login it waits for and every SDK call it
+makes (`secretUpdate` reads the current secret first when note or
+projects are omitted). A running login is shared by all calls, also after
+a caller timed out on it, and is only given up when it runs far past its
+deadline; a failed login is retried by the next call. Machine
 accounts and access tokens are intentionally **web-vault stubs**
 (`src/tools/wrappers/_web_vault_stub.ts`): they are not available to the
 credentials this server uses; only a logged-in user in the web vault can

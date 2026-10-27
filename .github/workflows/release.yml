@@ -117,10 +117,10 @@ jobs:
           PRERELEASE: ${{ needs.verify.outputs.prerelease }}
         run: |
           # A published asset is never replaced: its checksum and
-          # attestation may already be in use. Delete the release by
-          # hand and push a new tag instead.
+          # attestation may already be in use. Tags are never pushed
+          # again; RELEASING.md, "Recovering a release", has the steps.
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::error::Release $TAG already exists; assets are not overwritten."
+            echo "::error::Release $TAG already exists; assets are not overwritten. Use \"Re-run failed jobs\" for a later job, or see RELEASING.md, \"Recovering a release\"."
             exit 1
           fi
           flags=()

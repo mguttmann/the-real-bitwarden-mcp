@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { tryLoadSmSdk } from "../src/http/sm-sdk-client.js";
-import { TOKEN_BACKOFF_FAILURES, TOKEN_BACKOFF_MS } from "../src/limits.js";
+import {
+  SM_LOGIN_REUSE_TIMEOUTS,
+  TOKEN_BACKOFF_FAILURES,
+  TOKEN_BACKOFF_MS,
+} from "../src/limits.js";
 
 // A fake @bitwarden/sdk-napi module. No native binary, no network.
 type FakeOpts = {
@@ -8,11 +12,15 @@ type FakeOpts = {
   projectList?: () => Promise<unknown>;
   projectDelete?: () => Promise<unknown>;
   secretDelete?: () => Promise<unknown>;
+  secretGet?: () => Promise<unknown>;
+  secretUpdate?: (...args: unknown[]) => Promise<unknown>;
 };
 
 function fakeModule(opts: FakeOpts = {}) {
   const constructed: unknown[] = [];
   const login = vi.fn(opts.login ?? (async () => {}));
+  const secretGet = vi.fn(opts.secretGet ?? (async () => currentSecret));
+  const secretUpdate = vi.fn(opts.secretUpdate ?? (async () => currentSecret));
   class BitwardenClient {
     constructor(settings: unknown) {
       constructed.push(settings);
@@ -27,10 +35,14 @@ function fakeModule(opts: FakeOpts = {}) {
       };
     }
     secrets() {
-      return { delete: opts.secretDelete ?? (async () => ({ data: [] })) };
+      return {
+        delete: opts.secretDelete ?? (async () => ({ data: [] })),
+        get: secretGet,
+        update: secretUpdate,
+      };
     }
   }
-  return { mod: { BitwardenClient }, login, constructed };
+  return { mod: { BitwardenClient }, login, constructed, secretGet, secretUpdate };
 }
 
 const init = {
@@ -41,6 +53,16 @@ const init = {
 };
 
 const never = () => new Promise<never>(() => {});
+const after = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const currentSecret = {
+  id: "s1",
+  key: "K",
+  value: "FAKE-SECRET-1",
+  note: "keep me",
+  organizationId: "org-1",
+  projectId: "p9",
+};
 
 async function load(fake: ReturnType<typeof fakeModule>) {
   const loaded = await tryLoadSmSdk(init, async () => fake.mod);
@@ -140,11 +162,96 @@ describe("tryLoadSmSdk", () => {
     expect(fake.login).toHaveBeenCalledTimes(TOKEN_BACKOFF_FAILURES + 1);
   });
 
-  it("counts a timed-out SDK login as a failure", async () => {
-    const client = await load(fakeModule({ login: never }));
+  it("counts a timed-out SDK login as a failure once it is given up", async () => {
+    let t = 7_000_000;
+    const fake = fakeModule({ login: never });
+    const loaded = await tryLoadSmSdk({ ...init, now: () => t }, async () => fake.mod);
+    if (!loaded.ok) throw new Error("load failed");
+    const client = loaded.client;
     for (let i = 0; i < TOKEN_BACKOFF_FAILURES; i++) {
       await expect(client.projectList("org-1")).rejects.toThrow(/login timed out/);
+      // Past the reuse window: the next call gives this login up.
+      t += SM_LOGIN_REUSE_TIMEOUTS * init.timeoutMs;
     }
     await expect(client.projectList("org-1")).rejects.toThrow(/identity backoff/);
+    expect(fake.login).toHaveBeenCalledTimes(TOKEN_BACKOFF_FAILURES);
+  });
+
+  // Backlog sm-call-total-duration: login and call had a deadline each.
+  it("one deadline covers the login and the SDK call", async () => {
+    const client = await load(
+      fakeModule({
+        login: () => after(30),
+        projectList: async () => {
+          await after(30);
+          return { data: [] };
+        },
+      }),
+    );
+    await expect(client.projectList("org-1")).rejects.toThrow(/timed out after 50 ms/);
+  });
+
+  it("an update that keeps note and project reads and writes within one deadline", async () => {
+    const fake = fakeModule({
+      secretGet: async () => {
+        await after(30);
+        return currentSecret;
+      },
+      secretUpdate: async () => {
+        await after(30);
+        return currentSecret;
+      },
+    });
+    const client = await load(fake);
+    await expect(
+      client.secretUpdate("org-1", "s1", "K", "V2", undefined, undefined),
+    ).rejects.toThrow(/timed out after 50 ms; .*may or may not have been applied/);
+  });
+
+  it("an update fills an omitted note or projectIds from the current secret", async () => {
+    const fake = fakeModule();
+    const client = await load(fake);
+    await client.secretUpdate("org-1", "s1", "K", "V2", undefined, undefined);
+    expect(fake.secretGet).toHaveBeenCalledWith("s1");
+    expect(fake.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", "keep me", ["p9"]);
+    await client.secretUpdate("org-1", "s1", "K", "V2", undefined, ["p2"]);
+    expect(fake.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", "keep me", ["p2"]);
+    await client.secretUpdate("org-1", "s1", "K", "V2", "", undefined);
+    expect(fake.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", "", ["p9"]);
+    fake.secretGet.mockClear();
+    await client.secretUpdate("org-1", "s1", "K", "V2", "n", []);
+    expect(fake.secretGet).not.toHaveBeenCalled();
+    expect(fake.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", "n", []);
+  });
+
+  it("an update does not write when reading the current secret fails", async () => {
+    const fake = fakeModule({
+      secretGet: async () => {
+        throw new Error("Secret not found.");
+      },
+    });
+    const client = await load(fake);
+    await expect(
+      client.secretUpdate("org-1", "s1", "K", "V", undefined, undefined),
+    ).rejects.toThrow("Secret not found.");
+    expect(fake.secretUpdate).not.toHaveBeenCalled();
+  });
+
+  // Backlog sm-login-timeout-overlap: a timed-out login kept running and the
+  // next call started a second one.
+  it("a login that timed out is reused by the next call when it later succeeds", async () => {
+    const fake = fakeModule({ login: () => after(80) });
+    const client = await load(fake);
+    await expect(client.projectList("org-1")).rejects.toThrow(/login timed out after 50 ms/);
+    await expect(client.projectList("org-1")).resolves.toEqual([]);
+    expect(fake.login).toHaveBeenCalledTimes(1);
+    expect(fake.constructed).toHaveLength(1);
+  });
+
+  it("concurrent calls share one login", async () => {
+    const fake = fakeModule({ login: () => after(10) });
+    const client = await load(fake);
+    await Promise.all([client.projectList("org-1"), client.projectList("org-1")]);
+    expect(fake.login).toHaveBeenCalledTimes(1);
   });
 });

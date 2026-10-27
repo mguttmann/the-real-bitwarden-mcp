@@ -136,14 +136,9 @@ export function makeSecretUpdateTool(
         const org = (input.organizationId as string | undefined) ?? requireOrgId(orgId);
         const key = requireString(input, "key");
         const value = requireString(input, "value");
-        // The SDK update replaces the whole secret: carry over what the caller left out.
-        let note = typeof input.note === "string" ? input.note : undefined;
-        let projectIds = input.projectIds as string[] | undefined;
-        if (note === undefined || projectIds === undefined) {
-          const current = await sdk.secretGet(id);
-          note ??= current.note ?? "";
-          projectIds ??= current.projectId ? [current.projectId] : [];
-        }
+        // Omitted note or projectIds: the client keeps the current ones.
+        const note = typeof input.note === "string" ? input.note : undefined;
+        const projectIds = input.projectIds as string[] | undefined;
         const secret = await sdk.secretUpdate(org, id, key, value, note, projectIds);
         return jsonResult(secretMetadata(secret));
       } catch (err) {

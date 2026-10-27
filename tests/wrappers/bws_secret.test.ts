@@ -168,55 +168,26 @@ describe("bws_secret_* (SDK-backed)", () => {
   });
 
   // Audit case bws-secret-update-wipes-note-projects: the SDK update is a full
-  // replace; omitted fields were sent as "" and [].
-  it("update keeps the current note and project for omitted note and projectIds", async () => {
-    const sdk = stubSdk({
-      secretGet: vi.fn(async () => ({
-        id: "s1",
-        key: "K",
-        value: "FAKE-SECRET-1",
-        note: "keep me",
-        organizationId: "org-1",
-        projectId: "p9",
-      })),
-    });
+  // replace; omitted fields were sent as "" and []. The client now fills
+  // them from the current secret (tests/sm-sdk-client.test.ts), so the tool
+  // passes omitted fields on as undefined, never as "" or [].
+  it("update passes an omitted note or projectIds on as undefined", async () => {
+    const sdk = stubSdk();
     const tool = makeSecretUpdateTool(sdk, "org-1");
     await tool.handler({ id: "s1", key: "K", value: "V2" });
-    expect(sdk.secretGet).toHaveBeenCalledWith("s1");
-    expect(sdk.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", "keep me", ["p9"]);
+    expect(sdk.secretUpdate).toHaveBeenLastCalledWith(
+      "org-1",
+      "s1",
+      "K",
+      "V2",
+      undefined,
+      undefined,
+    );
     await tool.handler({ id: "s1", key: "K", value: "V2", projectIds: ["p2"] });
-    expect(sdk.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", "keep me", ["p2"]);
+    expect(sdk.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", undefined, ["p2"]);
     await tool.handler({ id: "s1", key: "K", value: "V2", note: "" });
-    expect(sdk.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", "", ["p9"]);
-  });
-
-  it("update does not read the secret when note and projectIds are given", async () => {
-    const sdk = stubSdk();
-    await makeSecretUpdateTool(sdk, "org-1").handler({
-      id: "s1",
-      key: "K",
-      value: "V2",
-      note: "n",
-      projectIds: [],
-    });
+    expect(sdk.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", "", undefined);
     expect(sdk.secretGet).not.toHaveBeenCalled();
-    expect(sdk.secretUpdate).toHaveBeenCalledWith("org-1", "s1", "K", "V2", "n", []);
-  });
-
-  it("update does not change the secret when reading the current one fails", async () => {
-    const sdk = stubSdk({
-      secretGet: vi.fn(async () => {
-        throw new Error("Secret not found.");
-      }),
-    });
-    const res = await makeSecretUpdateTool(sdk, "org-1").handler({
-      id: "s1",
-      key: "K",
-      value: "V",
-    });
-    expect(res.isError).toBe(true);
-    expect(textOf(res)).toContain("Secret not found.");
-    expect(sdk.secretUpdate).not.toHaveBeenCalled();
   });
 
   it("update schema advertises no defaults for note and projectIds", () => {

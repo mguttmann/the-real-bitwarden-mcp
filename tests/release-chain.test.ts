@@ -124,6 +124,36 @@ describe("release.yml MCP Registry", () => {
   });
 });
 
+describe("release recovery", () => {
+  // Backlog registry-dispatch-uses-main-server-json: a manual run took
+  // server.json from the branch it was started from and only the version
+  // from the tag.
+  it("mcp-registry.yml checks out the tag, validated before the checkout", () => {
+    const wf = read(".github/workflows/mcp-registry.yml");
+    const steps = wf.slice(wf.indexOf("    steps:"));
+    const validate = steps.indexOf("is not a stable release tag");
+    const checkout = steps.indexOf("uses: actions/checkout@");
+    expect(validate).toBeGreaterThan(-1);
+    expect(checkout).toBeGreaterThan(validate);
+    expect(steps.slice(checkout, steps.indexOf("\n      - ", checkout))).toContain(
+      "ref: refs/tags/${{ inputs.tag }}",
+    );
+    // The tag's server.json must already carry the tag version; it is not rewritten.
+    expect(wf).not.toContain("> server.json.tmp");
+    expect(wf).toContain("do not match tag");
+  });
+
+  // Backlog release-recovery-recipes: the error text told users to push a
+  // new tag, which RELEASING.md forbids.
+  it("release.yml never tells users to push a new tag, and its recipes are in RELEASING.md", () => {
+    expect(release).not.toMatch(/push a new tag/i);
+    expect(release).toContain("RELEASING.md");
+    const doc = read("RELEASING.md");
+    expect(doc).toContain("### Tag pushed while publishing was off");
+    expect(doc).toContain("### Half-created release");
+  });
+});
+
 describe("package.json for npm", () => {
   it("has the publish metadata the registry and provenance need", () => {
     expect(pkg.name).toBe("the-real-bitwarden-mcp");

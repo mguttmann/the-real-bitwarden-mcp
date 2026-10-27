@@ -16,6 +16,13 @@ export const TOKEN_BACKOFF_FAILURES = 3;
 /** Length of that pause; calls during it fail without a token request. */
 export const TOKEN_BACKOFF_MS = 30_000;
 
+/**
+ * A Secrets Manager SDK login that is still running is shared by later
+ * calls for up to this many HTTP_TIMEOUT_MS from its start; after that the
+ * next call gives it up and starts a new login.
+ */
+export const SM_LOGIN_REUSE_TIMEOUTS = 2;
+
 type JsonPath = (string | number)[];
 
 function pathText(path: JsonPath): string {

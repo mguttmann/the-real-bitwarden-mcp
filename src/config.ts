@@ -88,11 +88,16 @@ const DEFAULTS = {
   maxResponseBytes: DEFAULT_MAX_RESPONSE_BYTES,
 } as const;
 
+/**
+ * true/false, 1/0, yes/no and on/off in any case, surrounding whitespace
+ * ignored. Unset, empty, whitespace-only or unrecognised values give the
+ * fallback, so callers choose the safe side.
+ */
 function parseBool(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined) return fallback;
   const v = value.trim().toLowerCase();
-  if (v === "true" || v === "1" || v === "yes") return true;
-  if (v === "false" || v === "0" || v === "no") return false;
+  if (v === "true" || v === "1" || v === "yes" || v === "on") return true;
+  if (v === "false" || v === "0" || v === "no" || v === "off") return false;
   return fallback;
 }
 
@@ -246,8 +251,9 @@ export function loadConfig(env: Env = process.env): Config {
     cloud,
     sm,
     confirmWrites: parseBool(env.BITWARDEN_CONFIRM_WRITES, DEFAULTS.confirmWrites),
-    // Unset or empty: off. An unrecognised value turns it on (fails safe).
-    readOnly: env.BITWARDEN_READ_ONLY ? parseBool(env.BITWARDEN_READ_ONLY, true) : false,
+    // Unset, empty or whitespace only: off. An unrecognised value turns it
+    // on (fails safe).
+    readOnly: env.BITWARDEN_READ_ONLY?.trim() ? parseBool(env.BITWARDEN_READ_ONLY, true) : false,
     logLevel: parseLogLevel(env.LOG_LEVEL),
     httpTimeoutMs: parsePositiveInt(env.HTTP_TIMEOUT_MS, DEFAULTS.httpTimeoutMs),
     paginationMaxItems: parsePositiveInt(env.PAGINATION_MAX_ITEMS, DEFAULTS.paginationMaxItems),

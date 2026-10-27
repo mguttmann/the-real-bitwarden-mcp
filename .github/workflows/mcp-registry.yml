@@ -5,14 +5,15 @@ name: MCP Registry
 # io.github.<owner>/the-real-bitwarden-mcp.
 #
 #   workflow_call      from release.yml, after npm-publish succeeded
-#                      (stable versions only); the checkout is the tag
-#                      commit
+#                      (stable versions only)
 #   workflow_dispatch  by hand for an existing release tag, e.g. to retry a
-#                      failed publish; the checkout is the branch the run
-#                      is started from (main)
+#                      failed publish
 #
-# The only package is the npm package the-real-bitwarden-mcp. The version
-# is taken from the tag. The registry accepts the npm entry only when npm
+# Both check out the tag itself, so the published server.json is the one
+# released with that version, never a newer one from the branch the run
+# was started from. Its version must equal the tag version.
+#
+# The only package is the npm package the-real-bitwarden-mcp. The registry accepts the npm entry only when npm
 # serves that version with an mcpName equal to the server name, so the
 # run checks npm first:
 #   npm-published true   the caller has just published the version; the
@@ -74,16 +75,20 @@ jobs:
       MCP_PUBLISHER_VERSION: v1.8.5
       MCP_PUBLISHER_SHA256: 2d151ac57275c9a6684d9d22b1cba81058bab195ea0a162e8fce3c6a5ec32812
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set the release version in server.json
+      - name: Tag must be a stable release tag
         run: |
           set -euo pipefail
           if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Tag $TAG is not a stable release tag (vMAJOR.MINOR.PATCH)."
             exit 1
           fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+      - name: server.json of the tag must carry the tag version
+        run: |
+          set -euo pipefail
           version="${TAG#v}"
           name="$(jq -r .name server.json)"
           case "$name" in
@@ -93,14 +98,11 @@ jobs:
               exit 1
               ;;
           esac
-          jq --arg v "$version" '
-            .version = $v
-            | .packages |= map(
-                if .registryType == "npm" then .version = $v
-                else error("unexpected package type \(.registryType)")
-                end)
-          ' server.json > server.json.tmp
-          mv server.json.tmp server.json
+          found="$(jq -r '[.version] + [.packages[] | if .registryType == "npm" then .version else error("unexpected package type \(.registryType)") end] | unique | join(",")' server.json)"
+          if [ "$found" != "$version" ]; then
+            echo "::error::server.json versions ($found) do not match tag $TAG."
+            exit 1
+          fi
           cat server.json
       - name: npm must serve this version with the server name as mcpName
         run: |

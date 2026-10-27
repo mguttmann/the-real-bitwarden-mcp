@@ -275,7 +275,7 @@ boolean variables fall back to the default.
 | `BITWARDEN_CONFIRM_WRITES`         |                         | default `true`: write tools return a preview unless `confirm: "YES"`         |
 | `BITWARDEN_READ_ONLY`              |                         | default `false`; `true`: write tools stay listed but refuse to run           |
 | `LOG_LEVEL`                        |                         | `debug` \| `info` \| `warn` (default) \| `error`                             |
-| `HTTP_TIMEOUT_MS`                  |                         | default 30000; applies to API and OAuth token requests and SM SDK calls      |
+| `HTTP_TIMEOUT_MS`                  |                         | default 30000; API and OAuth token requests; one deadline per `bws_*` call   |
 | `PAGINATION_MAX_ITEMS`             |                         | default 1000                                                                 |
 | `PAGINATION_MAX_PAGES`             |                         | default 20                                                                   |
 | `BW_MCP_MAX_LIST_RESPONSE_BYTES`   |                         | default 60000; adds a `note` warning to list responses that exceed this size |
@@ -538,6 +538,12 @@ Optional parameters worth knowing:
   the token it returned with the same `start`, `end` and filters.
   `bw_member_list`, `bw_group_list` and `bw_collection_list` take no
   token: the Public API returns those lists in one response.
+- `truncated: true` means the server stopped at `PAGINATION_MAX_ITEMS`
+  or `PAGINATION_MAX_PAGES` while the API still offered a next page. If
+  the last page ended exactly at the limit, that next page can turn out
+  empty: the API sends a token without saying whether more items follow,
+  and the server does not spend an extra request to find out. Resuming
+  with the returned token then gives an empty list.
 
 ### Public API: generated raw tools (self-host)
 
@@ -574,8 +580,11 @@ account cannot remove all projects from a secret: the server rejects an
 update with `projectIds: []` for a secret that is in a project.
 
 The SDK logs in with `BWS_ACCESS_TOKEN` on the first `bws_*` call, not at
-startup; the login and each SDK call are bounded by `HTTP_TIMEOUT_MS`. A
-timed-out write may or may not have been applied.
+startup. One `HTTP_TIMEOUT_MS` deadline covers a whole `bws_*` call,
+including that login and, for `bws_secret_update` without `note` or
+`projectIds`, the read of the current secret. A login that runs into the
+deadline keeps running and the next call waits for it instead of starting
+a second one. A timed-out write may or may not have been applied.
 
 ### Secrets Manager: web vault only (always stubbed)
 
@@ -612,6 +621,10 @@ calling them always returns `isError: true` with a link to the web vault. Use
   names and schemas but refuse to run, also with `confirm: "YES"`, and
   `bw_raw_request` allows GET only. Unlike the confirm gate, the model
   cannot switch this off.
+- Both switches accept `true`/`false`, `1`/`0`, `yes`/`no` and `on`/`off`
+  in any case. An empty or whitespace-only `BITWARDEN_READ_ONLY` counts as
+  unset (off); any other unrecognised value turns read-only mode on, and
+  an unrecognised `BITWARDEN_CONFIRM_WRITES` keeps the confirm gate on.
 - The organization API key acts as a system user, not as a member, so
   Bitwarden applies no role hierarchy to it: `bw_member_invite` and
   `bw_member_update` can create or promote Owners. Use read-only mode or
@@ -674,7 +687,7 @@ line on stderr has the reason in `smSdk.kind` (`module_not_found` or
 A failed login (wrong token, identity server unreachable) gives a
 different tool error, "Secrets Manager SDK login failed: ..." or "...
 login timed out ...". Fix the token or URLs; the next `bws_*` call logs
-in again, no restart needed.
+in again (or waits for a login that is still running), no restart needed.
 
 On unsupported platforms, all Public-API tools (`bw_*`) continue to work
 normally. Only the `bws_project_*` and `bws_secret_*` tools are affected.

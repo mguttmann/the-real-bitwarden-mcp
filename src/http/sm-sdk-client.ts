@@ -2,6 +2,7 @@
 // Falls back gracefully when the binary isn't available for the current platform.
 
 import { UNKNOWN_OUTCOME_HINT } from "./bitwarden-http-client.js";
+import { SM_LOGIN_REUSE_TIMEOUTS } from "../limits.js";
 import { TokenBackoff } from "./token-backoff.js";
 
 type SdkProjectResponse = {
@@ -38,13 +39,18 @@ export type SmSdkClient = {
     note: string,
     projectIds: string[],
   ): Promise<SdkSecretResponse>;
+  /**
+   * The SDK update replaces the whole secret: an omitted (undefined) note or
+   * projectIds is read from the current secret first, within the same
+   * deadline.
+   */
   secretUpdate(
     orgId: string,
     id: string,
     key: string,
     value: string,
-    note: string,
-    projectIds: string[],
+    note: string | undefined,
+    projectIds: string[] | undefined,
   ): Promise<SdkSecretResponse>;
   secretDelete(id: string): Promise<unknown>;
 };
@@ -53,9 +59,12 @@ type SmSdkInit = {
   accessToken: string;
   apiUrl: string;
   identityUrl: string;
-  /** Deadline for the login and for each SDK call (HTTP_TIMEOUT_MS). */
+  /**
+   * Deadline of one client method (HTTP_TIMEOUT_MS), covering the login it
+   * may wait for and all SDK calls it makes.
+   */
   timeoutMs: number;
-  /** Clock for the login backoff (tests). */
+  /** Clock for the login backoff and the login reuse window (tests). */
   now?: () => number;
 };
 
@@ -68,22 +77,6 @@ type DeleteResponse = { data?: { id: string; error?: string | null }[] };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ImportSdk = () => Promise<any>;
-
-/**
- * The native calls cannot be cancelled: on timeout the call keeps running
- * in the background and its result is dropped.
- */
-async function withTimeout<T>(work: Promise<T>, ms: number, timeoutText: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(timeoutText)), ms);
-  });
-  try {
-    return await Promise.race([work, deadline]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 /** The SDK reports per-item delete failures inside a successful response. */
 function failOnItemError<T>(result: T): T {
@@ -122,57 +115,121 @@ export async function tryLoadSmSdk(
   }
 
   const ms = init.timeoutMs;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let session: Promise<any> | undefined;
+  const now = init.now ?? Date.now;
   // The SDK login is this client's token request: same pause as OAuthTokenCache.
-  const backoff = new TokenBackoff(init.now);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function loggedIn(): Promise<any> {
-    if (session) return session;
-    const attempt = (async () => {
-      backoff.check();
+  const backoff = new TokenBackoff(now);
+
+  type Login = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    promise: Promise<any>;
+    startedAt: number;
+    settled: boolean;
+    /** A waiter timed out on it; that already counted as a failure. */
+    counted: boolean;
+  };
+  let current: Login | undefined;
+
+  /**
+   * The login to wait for. A running login is shared by every call until it
+   * settles, also after a caller timed out on it, so a late success is used
+   * and no second login runs beside it. Only a login still running after
+   * SM_LOGIN_REUSE_TIMEOUTS x HTTP_TIMEOUT_MS is given up (it cannot be
+   * cancelled; its result is dropped) and a new one starts.
+   */
+  function sharedLogin(): Login {
+    if (current && (current.settled || now() - current.startedAt < SM_LOGIN_REUSE_TIMEOUTS * ms)) {
+      return current;
+    }
+    current = undefined;
+    backoff.check();
+    const entry: Login = {
+      promise: undefined as never,
+      startedAt: now(),
+      settled: false,
+      counted: false,
+    };
+    entry.promise = (async () => {
+      const rawClient = new mod.BitwardenClient({
+        apiUrl: init.apiUrl,
+        identityUrl: init.identityUrl,
+        userAgent: "the-real-bitwarden-mcp",
+      });
+      await rawClient.auth().loginAccessToken(init.accessToken);
+      return rawClient;
+    })().catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Secrets Manager SDK login failed: ${msg}. Check BWS_ACCESS_TOKEN, BWS_API_BASE and BWS_IDENTITY_URL; the next call retries the login.`,
+      );
+    });
+    entry.promise.then(
+      () => {
+        entry.settled = true;
+        if (current === entry) backoff.success();
+      },
+      (err: unknown) => {
+        entry.settled = true;
+        if (current !== entry) return;
+        current = undefined;
+        if (!entry.counted) backoff.failure(err);
+      },
+    );
+    current = entry;
+    return entry;
+  }
+
+  type Phase = "login" | "read" | "write";
+  type Step = <U>(phase: Phase, work: () => Promise<U>) => Promise<U>;
+
+  /**
+   * Run one client method under one deadline that covers the login and every
+   * SDK call it makes. The native calls cannot be cancelled: on timeout a
+   * call keeps running in the background and its result is dropped.
+   */
+  async function withDeadline<T>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    run: (rawClient: any, step: Step) => Promise<T>,
+  ): Promise<T> {
+    let phase: Phase = "login";
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const text =
+          phase === "login"
+            ? `Secrets Manager SDK login timed out after ${ms} ms; the next call waits for the same login or retries it.`
+            : phase === "write"
+              ? `Secrets Manager SDK call timed out after ${ms} ms; ${UNKNOWN_OUTCOME_HINT}.`
+              : `Secrets Manager SDK call timed out after ${ms} ms.`;
+        reject(new Error(text));
+      }, ms);
+    });
+    deadline.catch(() => {});
+    const step: Step = (p, work) => {
+      phase = p;
+      return Promise.race([Promise.resolve().then(work), deadline]);
+    };
+    try {
+      const login = sharedLogin();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let rawClient: any;
-      const login = (async () => {
-        rawClient = new mod.BitwardenClient({
-          apiUrl: init.apiUrl,
-          identityUrl: init.identityUrl,
-          userAgent: "the-real-bitwarden-mcp",
-        });
-        await rawClient.auth().loginAccessToken(init.accessToken);
-      })().catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(
-          `Secrets Manager SDK login failed: ${msg}. Check BWS_ACCESS_TOKEN, BWS_API_BASE and BWS_IDENTITY_URL; the next call retries the login.`,
-        );
-      });
       try {
-        await withTimeout(
-          login,
-          ms,
-          `Secrets Manager SDK login timed out after ${ms} ms; the next call retries the login.`,
-        );
+        rawClient = await step("login", () => login.promise);
       } catch (err) {
-        backoff.failure(err);
+        if (!login.settled && !login.counted) {
+          login.counted = true;
+          backoff.failure(err);
+        }
         throw err;
       }
-      backoff.success();
-      return rawClient;
-    })();
-    session = attempt;
-    attempt.catch(() => {
-      if (session === attempt) session = undefined;
-    });
-    return attempt;
+      return await run(rawClient, step);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async function call<T>(write: boolean, run: (rawClient: any) => Promise<T>): Promise<T> {
-    const rawClient = await loggedIn();
-    const text = write
-      ? `Secrets Manager SDK call timed out after ${ms} ms; ${UNKNOWN_OUTCOME_HINT}.`
-      : `Secrets Manager SDK call timed out after ${ms} ms.`;
-    return withTimeout(Promise.resolve(run(rawClient)), ms, text);
+  function call<T>(write: boolean, run: (rawClient: any) => Promise<T>): Promise<T> {
+    return withDeadline((rawClient, step) => step(write ? "write" : "read", () => run(rawClient)));
   }
 
   const client: SmSdkClient = {
@@ -203,7 +260,18 @@ export async function tryLoadSmSdk(
       return call(true, (c) => c.secrets().create(orgId, key, value, note, projectIds));
     },
     secretUpdate(orgId, id, key, value, note, projectIds) {
-      return call(true, (c) => c.secrets().update(orgId, id, key, value, note, projectIds));
+      return withDeadline(async (c, step) => {
+        if (note === undefined || projectIds === undefined) {
+          const existing: SdkSecretResponse = await step("read", () => c.secrets().get(id));
+          note ??= existing.note ?? "";
+          projectIds ??= existing.projectId ? [existing.projectId] : [];
+        }
+        const keptNote = note;
+        const keptProjects = projectIds;
+        return step("write", () =>
+          c.secrets().update(orgId, id, key, value, keptNote, keptProjects),
+        );
+      });
     },
     async secretDelete(id) {
       return failOnItemError(await call(true, (c) => c.secrets().delete([id])));

@@ -81,6 +81,35 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...minimalSelfhost, BITWARDEN_READ_ONLY: "ture" }).readOnly).toBe(true);
   });
 
+  it("BITWARDEN_READ_ONLY accepts on/off, yes/no, true/false and 1/0 in any case", () => {
+    for (const v of ["off", "OFF", "Off", "no", "NO", "false", "False", "0", " off "]) {
+      expect(loadConfig({ ...minimalSelfhost, BITWARDEN_READ_ONLY: v }).readOnly).toBe(false);
+    }
+    for (const v of ["on", "ON", "On", "yes", "Yes", "true", "1", " on "]) {
+      expect(loadConfig({ ...minimalSelfhost, BITWARDEN_READ_ONLY: v }).readOnly).toBe(true);
+    }
+  });
+
+  it("a BITWARDEN_READ_ONLY value of only whitespace counts as unset (off)", () => {
+    for (const v of [" ", "   ", "\t", " \n "]) {
+      expect(loadConfig({ ...minimalSelfhost, BITWARDEN_READ_ONLY: v }).readOnly).toBe(false);
+    }
+  });
+
+  it("BITWARDEN_CONFIRM_WRITES accepts off and on; whitespace or unknown keeps it on", () => {
+    expect(loadConfig({ ...minimalSelfhost, BITWARDEN_CONFIRM_WRITES: "OFF" }).confirmWrites).toBe(
+      false,
+    );
+    expect(loadConfig({ ...minimalSelfhost, BITWARDEN_CONFIRM_WRITES: "on" }).confirmWrites).toBe(
+      true,
+    );
+    for (const v of ["  ", "nope"]) {
+      expect(loadConfig({ ...minimalSelfhost, BITWARDEN_CONFIRM_WRITES: v }).confirmWrites).toBe(
+        true,
+      );
+    }
+  });
+
   it("defaults maxListResponseBytes to 60000", () => {
     const cfg = loadConfig(minimalSelfhost);
     expect(cfg.maxListResponseBytes).toBe(60000);
