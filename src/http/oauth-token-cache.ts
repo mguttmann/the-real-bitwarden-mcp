@@ -27,7 +27,9 @@ export class OAuthTokenCache {
   private readonly expiryBufferMs: number;
   private readonly timeoutMs: number;
 
-  private cached: { token: string; expiresAt: number } | undefined;
+  // bufferMs: refresh this long before expiry; at most half the lifetime, so
+  // a token that lives no longer than the buffer is still reused.
+  private cached: { token: string; expiresAt: number; bufferMs: number } | undefined;
   private inFlight: Promise<string> | undefined;
 
   constructor(opts: OAuthTokenCacheOptions) {
@@ -47,7 +49,7 @@ export class OAuthTokenCache {
 
   async getToken(): Promise<string> {
     const c = this.cached;
-    if (c && c.expiresAt - this.now() > this.expiryBufferMs) {
+    if (c && c.expiresAt - this.now() > c.bufferMs) {
       return c.token;
     }
     if (this.inFlight) return this.inFlight;
@@ -118,6 +120,7 @@ export class OAuthTokenCache {
     this.cached = {
       token: parsed.access_token,
       expiresAt: this.now() + parsed.expires_in * 1000,
+      bufferMs: Math.min(this.expiryBufferMs, (parsed.expires_in * 1000) / 2),
     };
     return parsed.access_token;
   }

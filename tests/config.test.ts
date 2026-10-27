@@ -78,6 +78,51 @@ describe("loadConfig", () => {
     expect(cfg.maxListResponseBytes).toBe(120000);
   });
 
+  it("rejects an API base or identity URL that is not a plain http(s) URL, naming the variable only", () => {
+    const bad = [
+      ["BITWARDEN_SELFHOST_API_BASE", "vault.example.invalid/api"],
+      ["BITWARDEN_SELFHOST_IDENTITY_URL", "ftp://vault.example.invalid/identity"],
+      ["BITWARDEN_SELFHOST_API_BASE", "https://vault.example.invalid/api?x=1"],
+      ["BITWARDEN_SELFHOST_IDENTITY_URL", "https://vault.example.invalid/identity#frag"],
+    ] as const;
+    for (const [name, value] of bad) {
+      let message = "";
+      try {
+        loadConfig({ ...minimalSelfhost, [name]: value });
+      } catch (err) {
+        message = (err as Error).message;
+      }
+      expect(message).toContain(name);
+      expect(message).not.toContain(value);
+    }
+    expect(() =>
+      loadConfig({ ...minimalCloud, BITWARDEN_CLOUD_API_BASE: "https://api.bitwarden.com?x" }),
+    ).toThrow(/BITWARDEN_CLOUD_API_BASE/);
+  });
+
+  it("rejects a bad BWS_API_BASE / BWS_IDENTITY_URL", () => {
+    const token =
+      "0.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB:CCCCCCCCCCCCCCCCCCCCCC==";
+    expect(() =>
+      loadConfig({ ...minimalSelfhost, BWS_ACCESS_TOKEN: token, BWS_API_BASE: "not a url" }),
+    ).toThrow(/BWS_API_BASE/);
+    expect(() =>
+      loadConfig({
+        ...minimalSelfhost,
+        BWS_ACCESS_TOKEN: token,
+        BWS_IDENTITY_URL: "https://h/identity?x",
+      }),
+    ).toThrow(/BWS_IDENTITY_URL/);
+  });
+
+  it("accepts http and https URLs with a path", () => {
+    const cfg = loadConfig({
+      ...minimalSelfhost,
+      BITWARDEN_SELFHOST_API_BASE: "http://127.0.0.1:8087/api/",
+    });
+    expect(cfg.selfhost?.apiBase).toBe("http://127.0.0.1:8087/api/");
+  });
+
   it("includes BWS_ORG_ID when set", () => {
     const token =
       "0.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB:CCCCCCCCCCCCCCCCCCCCCC==";

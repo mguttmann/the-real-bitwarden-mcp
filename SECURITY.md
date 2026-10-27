@@ -98,7 +98,8 @@ Out of scope:
   `bw_raw_request` also rejects control characters and backslashes.
 - Redirects are never followed, for API and OAuth token requests; a 3xx
   answer is an error.
-- `HTTP_TIMEOUT_MS` bounds API requests and the OAuth token request.
+- `HTTP_TIMEOUT_MS` bounds API requests and the OAuth token request; a
+  request that timed out is not retried.
   Calls into the Secrets Manager SDK have no timeout of their own.
 - Writes (POST, PUT, PATCH, DELETE) are not retried after a 5xx or a
   network error; only a 429 answer (request not processed) is retried

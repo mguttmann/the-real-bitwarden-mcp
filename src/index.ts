@@ -318,7 +318,25 @@ export function startStdio(
   return serveStdio(() => createMcpServer(registry, logger), {
     legacy: "serve",
     ...(transport ? { transport } : {}),
+    onerror: (err) => reportStdioError(logger, err),
   });
+}
+
+/**
+ * Transport errors are logged. An incoming line over the SDK's read buffer
+ * limit closes the transport and the process ends; exit non-zero so a
+ * supervisor sees a failure, not a clean shutdown.
+ */
+export function reportStdioError(logger: Logger, err: Error): void {
+  if (/ReadBuffer exceeded maximum size/.test(err.message)) {
+    logger.error(
+      { err },
+      "stdio: incoming message larger than the stdio limit; transport closed, exiting",
+    );
+    process.exitCode = 1;
+    return;
+  }
+  logger.warn({ err }, "stdio transport error");
 }
 
 /**

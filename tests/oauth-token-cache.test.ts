@@ -68,6 +68,34 @@ describe("OAuthTokenCache", () => {
   });
 
   it("refetches near expiry (within 60s buffer)", async () => {
+    let now = 0;
+    const fetchImpl = makeFetch([
+      new Response(JSON.stringify({ access_token: "t1", expires_in: 3600 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+      new Response(JSON.stringify({ access_token: "t2", expires_in: 3600 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    ]);
+    const cache = new OAuthTokenCache({
+      tokenUrl: "https://id/connect/token",
+      clientId: "x",
+      clientSecret: "y",
+      scope: "api.organization",
+      fetch: fetchImpl,
+      now: () => now,
+    });
+    expect(await cache.getToken()).toBe("t1");
+    now = 3_500_000; // 100 s left: still outside the buffer
+    expect(await cache.getToken()).toBe("t1");
+    now = 3_550_000; // 50 s left: inside the 60 s buffer
+    expect(await cache.getToken()).toBe("t2");
+  });
+
+  it("caches a token whose lifetime is at or below the 60 s buffer for half its lifetime", async () => {
+    let now = 0;
     const fetchImpl = makeFetch([
       new Response(JSON.stringify({ access_token: "t1", expires_in: 30 }), {
         status: 200,
@@ -84,8 +112,13 @@ describe("OAuthTokenCache", () => {
       clientSecret: "y",
       scope: "api.organization",
       fetch: fetchImpl,
+      now: () => now,
     });
     expect(await cache.getToken()).toBe("t1");
+    now = 10_000;
+    expect(await cache.getToken()).toBe("t1");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    now = 16_000;
     expect(await cache.getToken()).toBe("t2");
   });
 

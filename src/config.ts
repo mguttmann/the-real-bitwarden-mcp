@@ -1,4 +1,13 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+
+// A started-with `--env-file` process takes its environment from that file
+// only: a `.env` in the working directory (often the client's or gateway's)
+// is not merged on top. Without `--env-file` the working-directory `.env`
+// still fills unset variables. Always quiet: dotenv logs to stdout, which
+// carries the MCP stream.
+if (!process.execArgv.some((a) => /^--env-file(-if-exists)?(=|$)/.test(a))) {
+  dotenv.config({ quiet: true, debug: false });
+}
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -87,6 +96,24 @@ function parseLogLevel(value: string | undefined): LogLevel {
 
 type Env = Record<string, string | undefined>;
 
+/**
+ * Fail at startup on a base URL that cannot work: not parseable, not http(s),
+ * or with a query or fragment (which would swallow the request path). The
+ * error names the variable, never the value.
+ */
+function checkUrl(name: string, value: string | undefined): void {
+  if (value === undefined) return;
+  let url: URL | undefined;
+  try {
+    url = new URL(value);
+  } catch {
+    url = undefined;
+  }
+  if (!url || (url.protocol !== "https:" && url.protocol !== "http:") || /[?#]/.test(value)) {
+    throw new Error(`${name} must be an http(s) URL without query or fragment.`);
+  }
+}
+
 function loadSelfhost(env: Env): SelfhostConfig | undefined {
   const fields = {
     apiBase: env.BITWARDEN_SELFHOST_API_BASE,
@@ -101,6 +128,8 @@ function loadSelfhost(env: Env): SelfhostConfig | undefined {
       "Self-host partially configured. Set all four of BITWARDEN_SELFHOST_API_BASE, BITWARDEN_SELFHOST_IDENTITY_URL, BITWARDEN_SELFHOST_CLIENT_ID, BITWARDEN_SELFHOST_CLIENT_SECRET or none.",
     );
   }
+  checkUrl("BITWARDEN_SELFHOST_API_BASE", fields.apiBase);
+  checkUrl("BITWARDEN_SELFHOST_IDENTITY_URL", fields.identityUrl);
   return fields as SelfhostConfig;
 }
 
@@ -118,6 +147,8 @@ function loadCloud(env: Env): CloudConfig | undefined {
       "Cloud partially configured. Set all four of BITWARDEN_CLOUD_API_BASE, BITWARDEN_CLOUD_IDENTITY_URL, BITWARDEN_CLOUD_CLIENT_ID, BITWARDEN_CLOUD_CLIENT_SECRET or none.",
     );
   }
+  checkUrl("BITWARDEN_CLOUD_API_BASE", fields.apiBase);
+  checkUrl("BITWARDEN_CLOUD_IDENTITY_URL", fields.identityUrl);
   return fields as CloudConfig;
 }
 
@@ -174,6 +205,8 @@ function loadSm(env: Env, selfhost: SelfhostConfig | undefined): SmConfig | unde
       "BWS_ACCESS_TOKEN is set but BWS_API_BASE / BWS_IDENTITY_URL are not, and no self-host config to inherit from.",
     );
   }
+  checkUrl("BWS_API_BASE", env.BWS_API_BASE);
+  checkUrl("BWS_IDENTITY_URL", env.BWS_IDENTITY_URL);
   const parsedToken = parseBwsToken(token);
   return {
     apiBase,

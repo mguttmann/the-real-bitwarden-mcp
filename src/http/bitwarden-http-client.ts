@@ -34,7 +34,7 @@ const UNKNOWN_OUTCOME_HINT =
 
 /** A write that failed with a 5xx or a network error/timeout: it may have been applied. */
 export function isOutcomeUnknown(err: unknown): boolean {
-  return err instanceof BitwardenApiError && err.message.includes(UNKNOWN_OUTCOME_HINT);
+  return err instanceof BitwardenApiError && err.outcomeUnknown;
 }
 
 function unknownOutcome(method: string, err: BitwardenApiError): BitwardenApiError {
@@ -43,7 +43,19 @@ function unknownOutcome(method: string, err: BitwardenApiError): BitwardenApiErr
     err.code,
     `${err.message} (${method} not retried: ${UNKNOWN_OUTCOME_HINT})`,
     err.details,
+    { outcomeUnknown: true },
   );
+}
+
+/** Our own HTTP_TIMEOUT_MS abort; not retried, so one call stays near the timeout. */
+class RequestTimeoutError extends Error {}
+
+/** A fetch failure as a BitwardenApiError, keeping the cause code (for example ECONNREFUSED). */
+function networkError(err: unknown): BitwardenApiError {
+  const message = err instanceof Error ? err.message : String(err);
+  const cause = err instanceof Error ? (err.cause as { code?: unknown } | undefined) : undefined;
+  const code = typeof cause?.code === "string" ? ` (${cause.code})` : "";
+  return new BitwardenApiError(0, "network_error", `${message}${code}`);
 }
 
 export class BitwardenHttpClient {
@@ -70,21 +82,22 @@ export class BitwardenHttpClient {
   ): Promise<HttpResponse<T>> {
     const maxRetries = options.maxRetries ?? this.defaultMaxRetries;
     const idempotent = IDEMPOTENT_METHODS.has(method);
+    // Built before the loop: an invalid URL fails before anything is sent.
+    const url = this.buildUrl(path, options.query);
     let attempt = 0;
     let tokenRefreshed = false;
     while (true) {
       const token = await this.tokenCache.getToken();
       let res: HttpResponse<T>;
       try {
-        res = await this.doFetch<T>(method, path, options, token);
+        res = await this.doFetch<T>(method, url, options, token);
       } catch (err) {
         if (!idempotent) {
           // No HTTP status: the request may have reached the server (timeout,
           // connection reset after sending). Same type and hint as a 5xx.
-          const message = err instanceof Error ? err.message : String(err);
-          throw unknownOutcome(method, new BitwardenApiError(0, "network_error", message));
+          throw unknownOutcome(method, networkError(err));
         }
-        if (attempt >= maxRetries) throw err;
+        if (attempt >= maxRetries || err instanceof RequestTimeoutError) throw networkError(err);
         await this.sleep(1000 * 2 ** attempt);
         attempt++;
         continue;
@@ -117,11 +130,10 @@ export class BitwardenHttpClient {
 
   private async doFetch<T>(
     method: HttpMethod,
-    path: string,
+    url: string,
     options: RequestOptions,
     token: string,
   ): Promise<HttpResponse<T>> {
-    const url = this.buildUrl(path, options.query);
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(new Error("request timeout")),
@@ -141,6 +153,10 @@ export class BitwardenHttpClient {
       });
       const body = await this.parseBody<T>(res);
       return { status: res.status, headers: res.headers, body };
+    } catch (err) {
+      if (controller.signal.aborted)
+        throw new RequestTimeoutError("request timeout", { cause: err });
+      throw err;
     } finally {
       clearTimeout(timeout);
     }

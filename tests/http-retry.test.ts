@@ -112,6 +112,74 @@ describe("retry policy", () => {
   });
 });
 
+describe("network errors and timeouts", () => {
+  it("does not retry a GET that timed out (one call stays near HTTP_TIMEOUT_MS)", async () => {
+    let calls = 0;
+    const hanging = (_url: string | URL | Request, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        calls++;
+        init?.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+      });
+    const client = new BitwardenHttpClient({
+      apiBase: "https://h.example/api",
+      tokenCache: tokenCache as unknown as OAuthTokenCache,
+      fetch: hanging as typeof globalThis.fetch,
+      sleep: async () => {},
+      timeoutMs: 20,
+    });
+    await expect(client.request("GET", "/public/members")).rejects.toThrow(/request timeout/);
+    expect(calls).toBe(1);
+  });
+
+  it("keeps the cause code of a network error (write and GET)", async () => {
+    const refused = () => {
+      const cause = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:1"), {
+        code: "ECONNREFUSED",
+      });
+      throw new TypeError("fetch failed", { cause });
+    };
+    const write = await clientWith([refused])
+      .client.request("POST", "/public/x", { body: {} })
+      .catch((e) => e);
+    expect(String(write)).toMatch(/fetch failed \(ECONNREFUSED\)/);
+    expect(isOutcomeUnknown(write)).toBe(true);
+    const read = await clientWith([refused])
+      .client.request("GET", "/public/x", { maxRetries: 0 })
+      .catch((e) => e);
+    expect(String(read)).toMatch(/fetch failed \(ECONNREFUSED\)/);
+    expect(isOutcomeUnknown(read)).toBe(false);
+  });
+
+  it("a write that fails before anything is sent is not flagged as possibly applied", async () => {
+    let called = false;
+    const client = new BitwardenHttpClient({
+      apiBase: "not a url",
+      tokenCache: tokenCache as unknown as OAuthTokenCache,
+      fetch: (async () => {
+        called = true;
+        return ok();
+      }) as typeof globalThis.fetch,
+    });
+    const err = await client.request("POST", "/public/x", { body: {} }).catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(called).toBe(false);
+    expect(isOutcomeUnknown(err)).toBe(false);
+    expect(String(err)).not.toMatch(/may or may not have been applied/);
+  });
+
+  it("isOutcomeUnknown does not trust message text from upstream", async () => {
+    const echo = new Response(
+      "the request may or may not have been applied upstream; check the current state before repeating it",
+      { status: 400 },
+    );
+    const err = await clientWith([echo])
+      .client.request("PUT", "/public/x", { body: {} })
+      .catch((e) => e);
+    expect(err).toBeInstanceOf(BitwardenApiError);
+    expect(isOutcomeUnknown(err)).toBe(false);
+  });
+});
+
 describe("Retry-After", () => {
   it("caps a large delta-seconds value at 30 s", async () => {
     const { client, sleeps } = clientWith([status(429, { "retry-after": "3600" }), ok()]);

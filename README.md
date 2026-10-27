@@ -176,12 +176,15 @@ gateway that pins the tool surface, treat that as a deploy change.
 
 All values are environment variables. They come from the process
 environment (for example `node --env-file=.env`, or the `env` block of an
-MCP client config), and in addition from a `.env` file in the **process
-working directory**, which only fills variables that are not already set.
+MCP client config). When the server is **not** started with `--env-file`
+(or `--env-file-if-exists`), a `.env` file in the **process working
+directory** is read as well and only fills variables that are not already
+set; with `--env-file` it is ignored.
 **At least one instance must be fully configured**, otherwise the server
 refuses to start. A partially configured instance (some but not all four
-variables) is also fatal. URLs are not validated at startup; a wrong URL
-fails at the first call. Invalid values of the optional numeric and
+variables) is also fatal, and so is an API base or identity URL that is
+not an `http://` or `https://` URL or that has a query or fragment (the
+error names the variable). Invalid values of the optional numeric and
 boolean variables fall back to the default.
 
 | Variable                           | Required when                 | Purpose                                                                      |
@@ -366,8 +369,8 @@ node --env-file=/path/to/.env /path/to/dist/index.js
   by `tests/protocol-versions.test.ts`.
 - **Message size limit:** the MCP SDK's stdio transport accepts incoming
   lines (one JSON-RPC message each) of at most 10 MiB. A larger line
-  closes the transport and the process exits; the client has to start it
-  again.
+  closes the transport; the server logs an `error` line and exits with
+  code 1, and the client has to start it again.
 - **Tool names are stable.** Tool names and required parameters do not
   change within a minor release; changes that a caller can notice are
   listed under "Behaviour changes" in the [changelog](CHANGELOG.md).

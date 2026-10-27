@@ -7,16 +7,7 @@ change that fixes it.
 
 ## HTTP, tokens and transport
 
-- [config-url-not-validated] API base and identity URLs are not parsed or checked at startup (scheme, query, fragment); a bad URL fails at the first call.
-- [token-cache-edge-cases] An `expires_in` at or below the 60 s refresh buffer disables token caching; failed token requests are neither cached nor backed off.
-- [unbounded-response-buffering] Response bodies are read and returned in full with no size limit, including upstream error bodies in tool errors.
-- [stdio-10mib-silent-exit, stdio-10mib-kills-server, prod-stdio-10mib-exit] An incoming stdio line over 10 MiB (SDK limit) ends the process without a response or own log line; documented in README, not handled.
-- [epipe-crash-on-shutdown] An EPIPE on stdout when the client disconnects during an in-flight tool call is not handled.
-- [get-retry-total-duration] A GET that times out is retried, so one call can take about 4 x `HTTP_TIMEOUT_MS` plus backoff, which may exceed a gateway or client tool timeout.
-- [outcome-unknown-detection] `isOutcomeUnknown` detects the unknown-outcome case from the message text; a dedicated error field or code would be more robust.
-- [network-error-classification] Every `doFetch` failure on a write is reported as a possibly applied network error, also failures before anything was sent (for example an invalid URL); the warning errs on the safe side.
-- [network-error-cause-dropped] Write network errors keep only `err.message` (often "fetch failed"), not the underlying cause such as ECONNREFUSED.
-- [dotenv-cwd-merge-and-stdout, dotenv-cwd-merge] `import "dotenv/config"` also loads a `.env` from the working directory on top of `--env-file` (fills unset variables; documented in README); its debug output would go to stdout.
+- [unbounded-response-buffering] Successful response bodies are read and returned in full with no byte limit (upstream error texts are cut since 0.2.0). Kept: a limit changes successful tool output for large results and needs a chosen byte budget (owner decision).
 
 ## Secrets Manager
 

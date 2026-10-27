@@ -48,8 +48,10 @@ parameters are unchanged (pinned by `tests/tool-contract.test.ts`).
     (`server/discover`, per-request `_meta` envelope) are served at
     2026-07-28.
 - **Stdio message size limit**: a single incoming JSON-RPC message larger
-  than 10 MiB closes the transport and the process exits (SDK default).
-  The v0.1.1 lockfile pinned SDK 1.29, which had no limit.
+  than 10 MiB closes the transport and the process exits (SDK default)
+  with an `error` log line on stderr and exit code 1. The v0.1.1 lockfile
+  pinned SDK 1.29, which had no limit. Other stdio transport errors are
+  logged at `warn` (before: dropped silently).
 - **`serverInfo.version`** in the `initialize` result now reports the
   package version from `package.json` (it was hard-coded to `0.1.0`).
 - **npm bin `bitwarden-mcp`** (npx, global install,
@@ -116,7 +118,16 @@ parameters are unchanged (pinned by `tests/tool-contract.test.ts`).
   errors never). POST/PUT/PATCH/DELETE are sent once; on 5xx and on a
   network error or timeout the error text says the outcome is unknown
   (a network error on a write is a `BitwardenApiError` with status 0 and
-  code `network_error`). 429 is still retried for every method.
+  code `network_error`). 429 is still retried for every method. A GET
+  that runs into `HTTP_TIMEOUT_MS` is not retried, so one call stays near
+  the timeout (before: it was retried like any network error, with
+  backoff). A GET that still fails after its retries is now also a `BitwardenApiError` with
+  status 0 and code `network_error` (before: the raw fetch error). The
+  message of a network error keeps the cause code, for example
+  `fetch failed (ECONNREFUSED)` (before: `fetch failed`). A write that
+  fails before anything is sent (for example an invalid URL) is no longer
+  reported as possibly applied. `isOutcomeUnknown` reads a flag on the
+  error (`outcomeUnknown`) instead of matching the message text.
   `Retry-After` now also accepts an HTTP-date and the wait is capped at
   30 s (before: an HTTP-date caused an immediate retry, large values were
   not capped).
@@ -170,6 +181,27 @@ out after <ms> ms`.
   failing later with an undici error that quoted the token.
 - **Retry-After** values that are invalid or in the past fall back to the
   normal backoff.
+- **Base URLs are checked at startup.** `BITWARDEN_SELFHOST_API_BASE`,
+  `BITWARDEN_SELFHOST_IDENTITY_URL`, `BITWARDEN_CLOUD_API_BASE`,
+  `BITWARDEN_CLOUD_IDENTITY_URL`, `BWS_API_BASE` and `BWS_IDENTITY_URL`
+  must be `http://` or `https://` URLs without query or fragment;
+  otherwise the server refuses to start with an error that names the
+  variable (before: a bad URL failed at the first call). The placeholders
+  in `.env.example` are now `vault.example.invalid`, so an unedited copy
+  still starts.
+- **The working-directory `.env` is ignored when the server is started
+  with `--env-file`** (or `--env-file-if-exists`); before, it filled every
+  variable the env file did not set. Without `--env-file` it is still
+  read. dotenv runs quietly and no longer reads `DOTENV_CONFIG_*`
+  variables (`DOTENV_CONFIG_DEBUG` wrote to stdout, which carries the MCP
+  stream).
+- **OAuth tokens with a short lifetime are reused.** A token is refreshed
+  60 s before expiry, or after half its lifetime when that is shorter;
+  before, a token with `expires_in` of 60 s or less was fetched anew for
+  every request.
+- **Long upstream error texts are cut** to 2000 characters in tool
+  errors, followed by `... [truncated, <n> chars]` (before: a proxy's HTML
+  error page went into the tool error in full).
 
 ### Added
 

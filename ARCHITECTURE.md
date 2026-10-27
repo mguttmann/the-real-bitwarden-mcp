@@ -29,7 +29,7 @@ BitwardenHttpClient       BitwardenHttpClient         SmHttpClient (REST)
 | Layer     | Path                        | Responsibility                                                                                               |
 | --------- | --------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Entry     | `src/index.ts`              | Bootstrap, build clients, build registry, serve stdio (`serveStdio` of the MCP SDK v2)                       |
-| Config    | `src/config.ts`             | Read env (and `.env` in the cwd), parse 3-part `BWS_ACCESS_TOKEN`; URLs and ids are not validated            |
+| Config    | `src/config.ts`             | Read env (and `.env` in the cwd without `--env-file`), check base URLs, parse 3-part `BWS_ACCESS_TOKEN`      |
 | Logging   | `src/logger.ts`             | Pino; every log object goes through `src/redact.ts`                                                          |
 | HTTP      | `src/http/*`                | OAuth client_credentials, token cache, retries, pagination, host-locking                                     |
 | SM SDK    | `src/http/sm-sdk-client.ts` | Dynamic-loaded `@bitwarden/sdk-napi` wrapper, graceful fallback when binary missing                          |
@@ -69,8 +69,8 @@ Public API does not expose them with the required crypto layer.
   The model sets `confirm` itself, so this is friction against hasty
   writes, not a security boundary.
 - **Retries** (`src/http/bitwarden-http-client.ts`): 5xx and network
-  errors are retried for GET/HEAD only; 429 for every method, with
-  `Retry-After` capped.
+  errors are retried for GET/HEAD only, a timeout is not retried; 429 for
+  every method, with `Retry-After` capped.
 - **Slim list projections**: list tools strip nested fields by default
   and warn (not truncate) when the JSON exceeds
   `BW_MCP_MAX_LIST_RESPONSE_BYTES`. Use `include: ["all"]` to opt in.

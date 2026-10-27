@@ -26,4 +26,17 @@ describe("mapErrorResponse", () => {
     const err = mapErrorResponse(404, "Not Found")!;
     expect(err.message).toBe("Not Found");
   });
+
+  it("cuts a long upstream error body (for example a proxy HTML page) in the message", () => {
+    const page = "<html>" + "x".repeat(50_000) + "</html>";
+    const err = mapErrorResponse(502, page)!;
+    expect(err.message.length).toBeLessThanOrEqual(2000 + 40);
+    expect(err.message.startsWith("<html>xxx")).toBe(true);
+    expect(err.message).toMatch(/\[truncated, 50013 chars\]$/);
+  });
+
+  it("cuts a long validation message too", () => {
+    const err = mapErrorResponse(400, { Message: "m".repeat(5000) })!;
+    expect(err.message).toMatch(/^m{2000} \.\.\. \[truncated, 5000 chars\]$/);
+  });
 });
