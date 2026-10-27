@@ -57,7 +57,9 @@ export async function fetchAllPages<T>(
       break;
     }
     if (!body.continuationToken) break;
-    if (pageCount >= opts.maxPages) {
+    // A page that ends exactly at maxItems (or the last allowed page) stops
+    // here, so the next page's token is a clean resume point.
+    if (pageCount >= opts.maxPages || items.length >= opts.maxItems) {
       truncated = true;
       continuationToken = body.continuationToken;
       break;

@@ -7,10 +7,12 @@ change that fixes it.
 
 ## HTTP, tokens and transport
 
+- [token-cache-edge-cases] Failed token requests are neither cached nor backed off, so every call during an identity outage or with bad credentials sends a new token request (the short-lifetime half was fixed in 0.2.0). Kept: a backoff turns a recovered identity server into errors for a chosen time and needs a chosen policy (owner decision).
 - [unbounded-response-buffering] Successful response bodies are read and returned in full with no byte limit (upstream error texts are cut since 0.2.0). Kept: a limit changes successful tool output for large results and needs a chosen byte budget (owner decision).
 
 ## Secrets Manager
 
+- [completeness-gaps-unverified] Unverified: SDK access token renewal in long-running processes (the SDK client from the lazy login is reused for the life of the process; whether `@bitwarden/sdk-napi` renews its token is not checked). The Owner role half was checked against bitwarden/server in 0.2.0.
 - [sdk-napi-stale-no-arm64] `@bitwarden/sdk-napi` is still 1.0.0 with no linux-arm64 binary; watch upstream for a new release. Kept: upstream action (npm still lists 1.0.0 as latest, checked 2026-10-27).
 
 ## Tools and schemas

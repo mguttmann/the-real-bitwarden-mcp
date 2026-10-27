@@ -114,6 +114,26 @@ describe("fetchAllPages", () => {
     expect(res.continuationToken).toBeUndefined();
   });
 
+  it("a page that ends exactly at maxItems stops before the next page and returns its token", async () => {
+    const pages = [
+      { data: [{ id: 1 }, { id: 2 }], continuationToken: "t2" },
+      { data: [{ id: 3 }, { id: 4 }], continuationToken: "t3" },
+    ];
+    let i = 0;
+    const request = vi.fn(async () => ({ status: 200, headers: new Headers(), body: pages[i++] }));
+    const res = await fetchAllPages<{ id: number }>(
+      request as any,
+      "GET",
+      "/x",
+      {},
+      { maxItems: 2, maxPages: 10 },
+    );
+    expect(res.items.map((x) => x.id)).toEqual([1, 2]);
+    expect(res.truncated).toBe(true);
+    expect(res.continuationToken).toBe("t2");
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it("a maxPages truncation returns the token of the next page", async () => {
     const request = vi.fn(async () => ({
       status: 200,

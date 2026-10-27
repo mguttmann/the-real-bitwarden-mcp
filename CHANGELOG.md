@@ -245,7 +245,8 @@ out after <ms> ms`.
   `PAGINATION_MAX_ITEMS` inside a page, `continuationToken` is now `null`
   (before: on later pages it was the token of the current page, which
   repeats items already returned). A stop at `PAGINATION_MAX_PAGES` still
-  returns the token of the next page. The oversize note no longer tells
+  returns the token of the next page, and so does a page that ends exactly
+  at `PAGINATION_MAX_ITEMS` (the next page is no longer fetched). The oversize note no longer tells
   callers to page with `continuationToken` (no list tool accepts one); it
   suggests narrowing the query or the event window instead.
 - **New optional `BITWARDEN_READ_ONLY`** (default `false`, behaviour
