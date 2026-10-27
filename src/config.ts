@@ -1,12 +1,22 @@
+import { resolve } from "node:path";
 import dotenv from "dotenv";
 
 // A started-with `--env-file` process takes its environment from that file
 // only: a `.env` in the working directory (often the client's or gateway's)
 // is not merged on top. Without `--env-file` the working-directory `.env`
 // still fills unset variables. Always quiet: dotenv logs to stdout, which
-// carries the MCP stream.
+// carries the MCP stream. Every option is set explicitly because dotenv 18
+// reads DOTENV_* / DOTENV_CONFIG_* variables from the environment as
+// defaults (path, override, debug, ...), and explicit options win.
 if (!process.execArgv.some((a) => /^--env-file(-if-exists)?(=|$)/.test(a))) {
-  dotenv.config({ quiet: true, debug: false });
+  dotenv.config({
+    path: resolve(process.cwd(), ".env"),
+    encoding: "utf8",
+    override: false,
+    quiet: true,
+    debug: false,
+    fast: false,
+  });
 }
 
 export type LogLevel = "debug" | "info" | "warn" | "error";

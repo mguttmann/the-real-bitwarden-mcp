@@ -106,4 +106,28 @@ describe("stdio process", () => {
     expect(res.stdout).toBe("");
     expect(res.stderr).toMatch(/the-real-bitwarden-mcp ready/);
   }, 30_000);
+  it("without --env-file, DOTENV_* variables in the environment do not change which .env loads or how", async () => {
+    const cwd = tempDir();
+    writeFileSync(join(cwd, ".env"), [...selfhost, "LOG_LEVEL=error"].join("\n") + "\n");
+    const other = join(cwd, "other.env");
+    writeFileSync(other, [...selfhost, "LOG_LEVEL=info"].join("\n") + "\n");
+    const res = await run([], {
+      cwd,
+      env: cleanEnv({
+        LOG_LEVEL: "error",
+        DOTENV_PATH: other,
+        DOTENV_CONFIG_PATH: other,
+        DOTENV_OVERRIDE: "true",
+        DOTENV_CONFIG_OVERRIDE: "true",
+        DOTENV_DEBUG: "true",
+        DOTENV_QUIET: "false",
+        DOTENV_CONFIG_QUIET: "false",
+      }),
+    });
+    expect(res.code).toBe(0);
+    expect(res.stdout).toBe("");
+    // LOG_LEVEL stays "error" from the process environment: no ready line.
+    expect(res.stderr).not.toMatch(/ready/);
+    expect(res.stderr).not.toMatch(/injected env/);
+  }, 30_000);
 });
