@@ -131,6 +131,10 @@ publishing requires, and that the tarball matches `SHA256SUMS`.
 Provenance requires the repository to stay public. With the variable
 off, `npm-publish` and the `mcp-registry` job after it are skipped.
 
+If the first workflow publish fails after the GitHub release exists,
+recover as described in [RELEASING.md](../../RELEASING.md): "Re-run
+failed jobs" on the same run, not "Re-run all jobs" and not a new tag.
+
 Optionally, after the first publish through the workflow, disallow
 token-based publishing in the npm package settings so only the workflow
 can publish.

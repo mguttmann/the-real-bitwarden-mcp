@@ -18,8 +18,10 @@ npm dependency: npm installs them from the npm registry next to this
 package; neither this repository nor its npm package contains or
 redistributes them. They are not licensed under the MIT License of this
 project but under the Bitwarden Software Development Kit License
-Agreement (the LICENSE file of those packages, "SEE LICENSE IN LICENSE"
-in their package.json), which is between you and Bitwarden Inc. Read it
+Agreement (the LICENSE file shipped in the per-platform packages; the
+main package's package.json says "SEE LICENSE IN LICENSE"; see also
+https://github.com/bitwarden/sdk), which is between you and Bitwarden
+Inc. Read it
 before installing or using them. Without them the server still starts;
 the Secrets Manager tools then report that the SDK is not available.
 

@@ -35,6 +35,14 @@ assets are built by `scripts/release-assets.sh`.
 | `npm-publish`    | Only when the repository variable `NPM_PUBLISH_ENABLED` is `true`: checks the tarball against `SHA256SUMS` and runs `npm publish --provenance` through trusted publishing (OIDC). No npm token is stored.                                                   |
 | `mcp-registry`   | Stable tags only, after a successful `npm-publish`: runs `mcp-registry.yml`, which waits until npm serves the version with the right `mcpName` and publishes `server.json` to the official MCP Registry (GitHub OIDC). A version already listed is skipped. |
 
+If `npm-publish` or `mcp-registry` fails after `github-release` has
+created the release, fix the cause and use "Re-run failed jobs" on the
+same run: it reuses that run's build artifact, which matches the
+published release assets. Never use "Re-run all jobs" (it stops at
+`github-release` because the release already exists) and never push a
+new tag for the same version. A failed `mcp-registry` alone can also be
+retried by running the MCP Registry workflow by hand with the tag.
+
 The assets can be built locally the same way (Linux, after `npm ci`):
 
 ```bash

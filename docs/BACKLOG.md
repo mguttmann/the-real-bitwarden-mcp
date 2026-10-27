@@ -18,6 +18,7 @@ change that fixes it.
 - [sm-login-timeout-overlap] A login that runs into its deadline is not cancelled; the next call starts a second login while the first may still run in the background.
 - [completeness-gaps-unverified] Unverified: SDK access token renewal in long-running processes (the SDK client from the lazy login is reused for the life of the process; whether `@bitwarden/sdk-napi` renews its token is not checked). The Owner role half was checked against bitwarden/server in 0.2.0.
 - [sdk-napi-stale-no-arm64] `@bitwarden/sdk-napi` is still 1.0.0 with no linux-arm64 binary; watch upstream for a new release. Kept: upstream action (npm still lists 1.0.0 as latest, checked 2026-10-27).
+- [sdk-linux-x64-load-unproven] The gateway-style install (`npm ci --omit=dev --ignore-scripts` from the packed tarball) was probed only on linux/arm64, where the SDK is unavailable by design; loading `@bitwarden/sdk-napi-linux-x64-gnu` at runtime on linux/amd64 is unverified. Repeat the probe with `--platform linux/amd64` on a host with emulation before the gateway rollout.
 
 ## Tools and schemas
 
