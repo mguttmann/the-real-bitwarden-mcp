@@ -109,13 +109,16 @@ encryption.
 
 ### Cannot: these need a human in the web vault
 
-Bitwarden's APIs do not expose these. The SDK doesn't either.
+These are not available to the credentials this server uses (organization
+API key, machine account access token). The SDK and the `bws` CLI don't
+offer them either.
 
 - Create, update, delete Machine Accounts
 - Assign projects to a Machine Account
 - Create or rotate Machine Account Access Tokens
-- List all Machine Accounts in the organization (Machine Accounts cannot
-  enumerate each other; security model)
+- List all Machine Accounts in the organization
+  (machine accounts and access tokens can only be managed by a logged-in
+  user in the web vault)
 - Trigger a cloud to self-host license re-sync
 - **Read, grant or revoke** a member's Secrets Manager access. Bitwarden's
   Public API neither returns nor applies `accessSecretsManager`;
@@ -535,8 +538,10 @@ timed-out write may or may not have been applied.
   `..._revoke_project`
 - Access tokens: `bws_access_token_list`, `..._create`, `..._revoke`
 
-These tools are discoverable via `tools/list` and `bw_help`, but calling
-them always returns `isError: true` with a link to the web vault. Use
+They are not available to the credentials this server uses; only a
+logged-in user in the web vault can manage machine accounts and access
+tokens. The tools are discoverable via `tools/list` and `bw_help`, but
+calling them always returns `isError: true` with a link to the web vault. Use
 `https://<your-host>/#/sm/{orgId}/machine-accounts` to manage them.
 
 ### Universal

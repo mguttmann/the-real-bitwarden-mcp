@@ -1,28 +1,10 @@
 import type { ToolDef } from "../../types.js";
-import type { JSONSchema } from "../../types.js";
-import { readOnly } from "./_helpers.js";
-
-const WEB_VAULT_MSG =
-  "Not supported via API. Bitwarden's Public API + SDK does not expose Machine-Account or Access-Token management endpoints with the required crypto layer. " +
-  "Use the web vault: https://<your-host>/#/sm/{orgId}/machine-accounts";
-
-function unsupportedTool(name: string, description: string, schema: JSONSchema): ToolDef {
-  return {
-    name,
-    description,
-    inputSchema: schema,
-    annotations: readOnly,
-    handler: async () => ({
-      content: [{ type: "text" as const, text: WEB_VAULT_MSG }],
-      isError: true,
-    }),
-  };
-}
+import { webVaultStubTool } from "./_web_vault_stub.js";
 
 export function makeAccessTokenListTool(_client?: unknown): ToolDef {
-  return unsupportedTool(
+  return webVaultStubTool(
     "bws_access_token_list",
-    "List metadata for the access tokens of a machine account. NOTE: Not supported via API - use the web vault.",
+    "List metadata for the access tokens of a machine account.",
     {
       type: "object",
       properties: { machineAccountId: { type: "string" } },
@@ -33,9 +15,9 @@ export function makeAccessTokenListTool(_client?: unknown): ToolDef {
 }
 
 export function makeAccessTokenCreateTool(_client?: unknown): ToolDef {
-  return unsupportedTool(
+  return webVaultStubTool(
     "bws_access_token_create",
-    "Create a new access token for a machine account. NOTE: Not supported via API - use the web vault.",
+    "Create a new access token for a machine account.",
     {
       type: "object",
       properties: {
@@ -54,9 +36,9 @@ export function makeAccessTokenCreateTool(_client?: unknown): ToolDef {
 }
 
 export function makeAccessTokenRevokeTool(_client?: unknown): ToolDef {
-  return unsupportedTool(
+  return webVaultStubTool(
     "bws_access_token_revoke",
-    "Revoke one or more access tokens of a machine account. NOTE: Not supported via API - use the web vault.",
+    "Revoke one or more access tokens of a machine account.",
     {
       type: "object",
       properties: {
