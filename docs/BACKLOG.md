@@ -22,6 +22,7 @@ change that fixes it.
 - [new-fields-old-servers] `inviteUsersAfterProvisioning` (bw_org_import) and the newer permission flags exist only in recent Bitwarden server versions; an older self-hosted server ignores unknown fields silently, so `inviteUsersAfterProvisioning: false` would still send invitations there. Document the minimum server version in README and the tool description.
 - [member-update-permissions] `bw_member_update` keeps a Custom member's current permissions but cannot set new ones (only `bw_member_invite` got `permissions` in 0.3.0); changing the flags needs `bw_raw_request`. The Public API accepts `permissions` on PUT.
 - [license-delta-lost-update] The `bw_license_*_update` tools are read-modify-write; calls in one process are serialized since 0.2.0, but separate server processes can still lose an update. Kept: the API has no conditional update (upstream).
+- [cut-hint-no-event-limit] Since 0.3.1 `bw_event_query` has an optional `limit`, but the cut hint (`CUT_HINT` in `src/limits.ts`) and the events oversize note (`maybeNoteOversize` in `src/tools/wrappers/_helpers.ts`, used by `src/tools/wrappers/bw_event.ts`) still only suggest filters and a shorter start/end window; name `limit` there.
 - [placeholder-annotations-flip] Stub and placeholder write tools are annotated read-only and have no `confirm` property; configuring Secrets Manager later changes their annotations and schema. Kept: changes the tool contract (placeholders are pinned with no properties).
 
 ## Release and repository
