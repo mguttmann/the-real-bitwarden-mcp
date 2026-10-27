@@ -56,6 +56,8 @@ export type Config = {
   cloud: CloudConfig | undefined;
   sm: SmConfig | undefined;
   confirmWrites: boolean;
+  /** BITWARDEN_READ_ONLY: write tools stay listed but refuse to run. */
+  readOnly: boolean;
   logLevel: LogLevel;
   httpTimeoutMs: number;
   paginationMaxItems: number;
@@ -230,6 +232,8 @@ export function loadConfig(env: Env = process.env): Config {
     cloud,
     sm,
     confirmWrites: parseBool(env.BITWARDEN_CONFIRM_WRITES, DEFAULTS.confirmWrites),
+    // Unset or empty: off. An unrecognised value turns it on (fails safe).
+    readOnly: env.BITWARDEN_READ_ONLY ? parseBool(env.BITWARDEN_READ_ONLY, true) : false,
     logLevel: parseLogLevel(env.LOG_LEVEL),
     httpTimeoutMs: parsePositiveInt(env.HTTP_TIMEOUT_MS, DEFAULTS.httpTimeoutMs),
     paginationMaxItems: parsePositiveInt(env.PAGINATION_MAX_ITEMS, DEFAULTS.paginationMaxItems),

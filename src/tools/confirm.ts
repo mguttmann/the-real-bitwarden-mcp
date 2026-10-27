@@ -2,9 +2,33 @@ import type { PlannedRequest, ToolDef, ToolResult } from "../types.js";
 import { asToolError } from "./_error.js";
 import { maskSecretValues } from "../redact.js";
 
-function shouldGuard(tool: ToolDef, enabled: boolean): boolean {
-  if (!enabled) return false;
+function isWriteTool(tool: ToolDef): boolean {
   return tool.annotations.destructiveHint || !tool.annotations.readOnlyHint;
+}
+
+function shouldGuard(tool: ToolDef, enabled: boolean): boolean {
+  return enabled && isWriteTool(tool);
+}
+
+export function readOnlyRefusal(toolName: string): ToolResult {
+  return {
+    content: [
+      {
+        type: "text",
+        text: `${toolName} was not executed: the server runs in read-only mode (BITWARDEN_READ_ONLY=true), which refuses every write.`,
+      },
+    ],
+    isError: true,
+  };
+}
+
+/**
+ * BITWARDEN_READ_ONLY: write tools keep their name and schema (so the tool
+ * list and its fingerprints do not change) but refuse to run.
+ */
+export function withReadOnly(tool: ToolDef, readOnly: boolean): ToolDef {
+  if (!readOnly || !isWriteTool(tool)) return tool;
+  return { ...tool, handler: async () => readOnlyRefusal(tool.name) };
 }
 
 function describePlan(plan: PlannedRequest): string {

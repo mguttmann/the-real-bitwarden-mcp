@@ -121,6 +121,40 @@ describe("bw_raw_request", () => {
     expect(sh.request).toHaveBeenCalled();
   });
 
+  it("rejects a non-GET in read-only mode, also with confirm=YES, and sends nothing", async () => {
+    const sh = stubClient();
+    const tool = makeRawRequestTool({
+      selfhost: sh as any,
+      cloud: undefined,
+      sm: undefined,
+      confirmWrites: true,
+      readOnly: true,
+    });
+    const res = await tool.handler({
+      method: "DELETE",
+      path: "/public/members/m1",
+      confirm: "YES",
+    });
+    expect(sh.request).not.toHaveBeenCalled();
+    expect(res.isError).toBe(true);
+    expect(textOf(res)).toMatch(/read-only mode/i);
+    expect(textOf(res)).toContain("BITWARDEN_READ_ONLY");
+  });
+
+  it("lets GET through in read-only mode", async () => {
+    const sh = stubClient();
+    const tool = makeRawRequestTool({
+      selfhost: sh as any,
+      cloud: undefined,
+      sm: undefined,
+      confirmWrites: false,
+      readOnly: true,
+    });
+    const res = await tool.handler({ method: "GET", path: "/public/members" });
+    expect(sh.request).toHaveBeenCalled();
+    expect(res.isError).toBeUndefined();
+  });
+
   it("lets GET through even when confirmWrites=true", async () => {
     const sh = stubClient();
     const tool = makeRawRequestTool({

@@ -202,6 +202,7 @@ boolean variables fall back to the default.
 | `BWS_IDENTITY_URL`                 | SM tools (optional)     | Defaults to selfhost identity URL                                            |
 | `BWS_ORG_ID`                       | SM project/secret tools | Organization UUID, used when `organizationId` is not passed                  |
 | `BITWARDEN_CONFIRM_WRITES`         |                         | default `true`: write tools return a preview unless `confirm: "YES"`         |
+| `BITWARDEN_READ_ONLY`              |                         | default `false`; `true`: write tools stay listed but refuse to run           |
 | `LOG_LEVEL`                        |                         | `debug` \| `info` \| `warn` (default) \| `error`                             |
 | `HTTP_TIMEOUT_MS`                  |                         | default 30000; applies to API and OAuth token requests and SM SDK calls      |
 | `PAGINATION_MAX_ITEMS`             |                         | default 1000                                                                 |
@@ -466,6 +467,17 @@ them always returns `isError: true` with a link to the web vault. Use
   Bitwarden data can steer it. Read-only tools, including
   `bws_secret_get_value`, are never gated. Limit what the configured keys
   and the machine account may do, and which tools each user may call.
+- `BITWARDEN_READ_ONLY=true` (default `false`): write tools keep their
+  names and schemas but refuse to run, also with `confirm: "YES"`, and
+  `bw_raw_request` allows GET only. Unlike the confirm gate, the model
+  cannot switch this off.
+- The organization API key acts as a system user, not as a member, so
+  Bitwarden applies no role hierarchy to it: `bw_member_invite` and
+  `bw_member_update` can create or promote Owners. Use read-only mode or
+  gateway rules where callers must not do that.
+- The server sends MCP instructions telling the model to treat Bitwarden
+  data as data, never as instructions. This is a hint to the model, not
+  a control.
 - The `bws_secret_list` tool returns secret identifiers only (no value field).
   Cleartext values are only returned through `bws_secret_get_value(id)`, one
   secret at a time: `bws_secret_create` / `bws_secret_update` return the

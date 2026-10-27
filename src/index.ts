@@ -13,7 +13,7 @@ import { SmHttpClient } from "./http/sm-client.js";
 import { tryLoadSmSdk, type SmSdkClient, type SmSdkLoadError } from "./http/sm-sdk-client.js";
 import { createMcpServer } from "./server.js";
 import { ToolRegistry } from "./tools/registry.js";
-import { withConfirmGuard } from "./tools/confirm.js";
+import { withConfirmGuard, withReadOnly } from "./tools/confirm.js";
 import { makeRawRequestTool } from "./tools/raw_request.js";
 import { makeHelpTool } from "./tools/help.js";
 
@@ -183,7 +183,8 @@ function notConfiguredTool(name: string, reason: string): ToolDef {
 export function buildRegistry(config: Config, clients: Clients): ToolRegistry {
   const reg = new ToolRegistry();
   const limits = { maxItems: config.paginationMaxItems, maxPages: config.paginationMaxPages };
-  const guard = (tool: ToolDef) => reg.register(withConfirmGuard(tool, config.confirmWrites));
+  const guard = (tool: ToolDef) =>
+    reg.register(withReadOnly(withConfirmGuard(tool, config.confirmWrites), config.readOnly));
 
   if (clients.selfhost) {
     const sh = clients.selfhost;
@@ -299,6 +300,7 @@ export function buildRegistry(config: Config, clients: Clients): ToolRegistry {
       cloud: clients.cloud,
       sm: clients.sm,
       confirmWrites: config.confirmWrites,
+      readOnly: config.readOnly,
     }),
   );
   reg.register(makeHelpTool(reg));

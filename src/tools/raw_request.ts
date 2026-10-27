@@ -3,6 +3,7 @@ import type { BitwardenHttpClient, HttpMethod } from "../http/bitwarden-http-cli
 import { assertSafePath } from "../http/path-safety.js";
 import { maskSecretValues, scrubClientText } from "../redact.js";
 import { asToolError } from "./_error.js";
+import { readOnlyRefusal } from "./confirm.js";
 
 const VALID: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 const INSTANCES: Instance[] = ["selfhost", "cloud", "sm"];
@@ -12,6 +13,8 @@ type RawRequestDeps = {
   cloud: BitwardenHttpClient | undefined;
   sm: BitwardenHttpClient | undefined;
   confirmWrites: boolean;
+  /** BITWARDEN_READ_ONLY: refuse every method but GET. */
+  readOnly?: boolean;
 };
 
 export function makeRawRequestTool(deps: RawRequestDeps): ToolDef {
@@ -123,6 +126,7 @@ export function makeRawRequestTool(deps: RawRequestDeps): ToolDef {
       }
 
       const isWrite = method !== "GET";
+      if (isWrite && deps.readOnly) return readOnlyRefusal("bw_raw_request");
       if (isWrite && deps.confirmWrites && input.confirm !== "YES") {
         const { confirm: _drop, ...rest } = input;
         const preview = maskSecretValues(rest);

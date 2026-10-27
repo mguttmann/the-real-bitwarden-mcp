@@ -22,12 +22,6 @@ change that fixes it.
 - [license-delta-lost-update] The `bw_license_*_update` tools are read-modify-write; calls in one process are serialized since 0.2.0, but separate server processes can still lose an update. Kept: the API has no conditional update (upstream).
 - [placeholder-annotations-flip] Stub and placeholder write tools are annotated read-only and have no `confirm` property; configuring Secrets Manager later changes their annotations and schema. Kept: changes the tool contract (placeholders are pinned with no properties).
 
-## Safety model
-
-- [confirm-gate-self-confirm-no-readonly] The confirm gate is a self-confirmation by the model (documented); there is no read-only mode and no real dry-run switch.
-- [prompt-injection-no-framing] Upstream strings (names, notes, event data, error bodies) reach the model unframed and the server sends no instructions (documented in SECURITY.md).
-- [completeness-gaps-unverified] Not yet reviewed: role changes towards Owner through the member tools, and SDK token renewal in long-running processes.
-
 ## Tests
 
 - [live-smoke-false-green] `tests/live-smoke.test.ts` still returns early (passes) when a tool is not registered, instead of skipping visibly.

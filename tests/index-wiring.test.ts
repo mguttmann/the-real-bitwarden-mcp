@@ -14,6 +14,7 @@ function emptyConfig(overrides: Partial<Config>): Config {
     cloud: undefined,
     sm: undefined,
     confirmWrites: false,
+    readOnly: false,
     logLevel: "error",
     httpTimeoutMs: 30000,
     paginationMaxItems: 100,
@@ -162,5 +163,52 @@ describe("buildRegistry", () => {
     const res = await stub!.handler({ organizationId: "org-1" });
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/SDK not available/i);
+  });
+});
+
+describe("buildRegistry in read-only mode", () => {
+  const selfhost = { apiBase: "x", identityUrl: "y", clientId: "z", clientSecret: "w" };
+
+  function listed(readOnly: boolean, confirmWrites: boolean) {
+    const reg = buildRegistry(
+      emptyConfig({ selfhost, sm: smConfig, readOnly, confirmWrites }),
+      fakeClients({ selfhost: true, cloud: false, sm: true, smSdk: stubSmSdk() }),
+    );
+    return reg.getAll().map((t) => ({ name: t.name, inputSchema: t.inputSchema }));
+  }
+
+  it("keeps every tool name and input schema unchanged", () => {
+    expect(listed(true, true)).toEqual(listed(false, true));
+    expect(listed(true, false)).toEqual(listed(false, false));
+  });
+
+  it("write tools answer with an error and never reach the upstream, also with confirm=YES", async () => {
+    const sdk = stubSmSdk();
+    const clients = fakeClients({ selfhost: true, cloud: false, sm: true, smSdk: sdk });
+    const request = vi.spyOn(clients.selfhost!, "request");
+    const reg = buildRegistry(emptyConfig({ selfhost, sm: smConfig, readOnly: true }), clients);
+    for (const [name, input] of [
+      ["bw_member_remove", { id: "m1", confirm: "YES" }],
+      ["bws_secret_delete", { id: "s1", confirm: "YES" }],
+      ["bws_project_create", { name: "p" }],
+    ] as const) {
+      const res = await reg.getByName(name)!.handler({ ...input });
+      expect(res.isError, name).toBe(true);
+      expect(textOf(res), name).toMatch(/read-only mode/i);
+    }
+    expect(request).not.toHaveBeenCalled();
+    expect(sdk.secretDelete).not.toHaveBeenCalled();
+    expect(sdk.projectCreate).not.toHaveBeenCalled();
+  });
+
+  it("read tools still run", async () => {
+    const sdk = stubSmSdk();
+    const reg = buildRegistry(
+      emptyConfig({ selfhost, sm: smConfig, readOnly: true }),
+      fakeClients({ selfhost: true, cloud: false, sm: true, smSdk: sdk }),
+    );
+    const res = await reg.getByName("bws_project_list")!.handler({ organizationId: "org-1" });
+    expect(res.isError).toBeUndefined();
+    expect(sdk.projectList).toHaveBeenCalled();
   });
 });

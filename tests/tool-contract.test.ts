@@ -45,6 +45,7 @@ function config(withSm: boolean): Config {
         }
       : undefined,
     confirmWrites: true,
+    readOnly: false,
     logLevel: "error",
     httpTimeoutMs: 30_000,
     paginationMaxItems: 1000,

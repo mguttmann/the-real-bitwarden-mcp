@@ -71,6 +71,9 @@ Public API does not expose them with the required crypto layer.
   function also show the effective request (after merging current state).
   The model sets `confirm` itself, so this is friction against hasty
   writes, not a security boundary.
+- **Read-only mode** (`withReadOnly` in `src/tools/confirm.ts`): with
+  `BITWARDEN_READ_ONLY=true` every write tool keeps its name and schema
+  but refuses to run, and `bw_raw_request` allows GET only.
 - **Retries** (`src/http/bitwarden-http-client.ts`): 5xx and network
   errors are retried for GET/HEAD only, a timeout is not retried; 429 for
   every method, with `Retry-After` capped.

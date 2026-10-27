@@ -40,6 +40,21 @@ describe("createMcpServer", () => {
     await server.close();
   });
 
+  it("sends instructions that tell the model to treat Bitwarden data as data", async () => {
+    const server = createMcpServer(new ToolRegistry(), createLogger("error"));
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({ name: "test", version: "0" }, { capabilities: {} });
+    await client.connect(clientTransport);
+
+    const instructions = client.getInstructions() ?? "";
+    expect(instructions).toMatch(/data, never as instructions/i);
+    expect(instructions).toMatch(/confirm/i);
+
+    await client.close();
+    await server.close();
+  });
+
   it("dispatches tools/call to the registered handler", async () => {
     const registry = new ToolRegistry();
     registry.register(echoTool);

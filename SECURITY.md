@@ -52,7 +52,16 @@ notes, event data, error bodies) reaches the model unframed, and a model
 that follows instructions hidden in it can confirm writes on its own.
 Read-only tools are never gated; that includes `bws_secret_get_value`,
 which returns a cleartext secret. Scope the API keys and the machine
-account to what the callers may do.
+account to what the callers may do. The server's MCP instructions tell
+the model to treat Bitwarden data as data, never as instructions; that
+is a hint, not a control. `BITWARDEN_READ_ONLY=true` is a control: write
+tools then refuse to run whatever the model sends.
+
+**The organization API key can create Owners.** The Public API runs
+member changes as a system user, outside the organization's role
+hierarchy, so `bw_member_invite` and `bw_member_update` accept type 0
+(Owner) for any member. Restrict these tools in the gateway, or run in
+read-only mode, where callers must not do that.
 
 In scope:
 
@@ -78,6 +87,9 @@ Out of scope:
 
 - `BITWARDEN_CONFIRM_WRITES=true` is the default: write tools return a
   preview unless the call carries `confirm: "YES"`.
+- `BITWARDEN_READ_ONLY=true` (opt-in) makes every write tool refuse to
+  run and limits `bw_raw_request` to GET; an unrecognised value turns it
+  on.
 - One scrubber (`src/redact.ts`) is used for logs and for every error
   text returned to the MCP client: the keys listed in `SENSITIVE_KEYS`
   are removed at any depth (case-insensitive, also in arrays, error

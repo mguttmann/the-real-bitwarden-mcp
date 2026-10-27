@@ -68,6 +68,19 @@ describe("loadConfig", () => {
     expect(cfg.confirmWrites).toBe(false);
   });
 
+  it("BITWARDEN_READ_ONLY defaults to off; true, 1 and yes turn it on", () => {
+    expect(loadConfig(minimalSelfhost).readOnly).toBe(false);
+    expect(loadConfig({ ...minimalSelfhost, BITWARDEN_READ_ONLY: "" }).readOnly).toBe(false);
+    expect(loadConfig({ ...minimalSelfhost, BITWARDEN_READ_ONLY: "false" }).readOnly).toBe(false);
+    for (const v of ["true", "1", "yes", "TRUE"]) {
+      expect(loadConfig({ ...minimalSelfhost, BITWARDEN_READ_ONLY: v }).readOnly).toBe(true);
+    }
+  });
+
+  it("an unrecognised BITWARDEN_READ_ONLY value turns read-only mode on (fails safe)", () => {
+    expect(loadConfig({ ...minimalSelfhost, BITWARDEN_READ_ONLY: "ture" }).readOnly).toBe(true);
+  });
+
   it("defaults maxListResponseBytes to 60000", () => {
     const cfg = loadConfig(minimalSelfhost);
     expect(cfg.maxListResponseBytes).toBe(60000);
