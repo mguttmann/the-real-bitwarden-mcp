@@ -35,6 +35,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   symlink exited with code 0 without doing anything. Starting
   `node dist/index.js` directly is unaffected.
 
+- **`bw_member_update` keeps state for omitted fields.** Before, leaving out
+  `groups`, `collections` or `externalId` sent `[]` / `null` and removed the
+  member from all groups, all direct collection access and the external id;
+  a Custom member also lost its custom permissions. Now `groups` is only sent
+  when given (the API keeps memberships otherwise), and `externalId`,
+  `collections` and (for Custom members staying Custom) `permissions` are
+  read from the current member (one extra GET) when not given. The schema no
+  longer advertises `default: []` / `default: null` for these fields.
+- **`bw_group_update` keeps state for omitted fields.** A rename no longer
+  sends `collections: []` (which removed all collection access of the
+  group) or `externalId: null`; `collections` is only sent when given and
+  `externalId` is read from the current group when not given.
+- **`bw_policy_set` keeps the policy data when `data` is omitted.** Before,
+  it sent `data: null`, which cleared the policy settings (for example on a
+  plain enable/disable). Now the current data is read first (one extra GET);
+  an explicit `data: null` still clears it.
+- **`accessAll` on `bw_group_create` / `bw_group_update`** (removed from the
+  Bitwarden API, it was silently ignored) is no longer sent; `true` now
+  returns an error and nothing is written. `false` is accepted and ignored.
+- **`bw_collection_update`**: a non-empty `users` list now returns an error
+  (the Public API has no per-user collection access; it was silently
+  dropped). `groups` is only sent when given (before, omitting it sent
+  `groups: []` and removed all group access), and `externalId` is read from
+  the current collection when not given. Description corrected.
+- **Confirm previews of `bw_member_update`, `bw_group_update`,
+  `bw_collection_update`, `bw_policy_set` and the four `bw_license_*_update` tools** now also
+  show the effective request (method, path, body after merging, and which
+  fields are left out). Building it may issue read-only GET requests; input
+  the tool cannot apply already returns the error at preview time.
+- **`bw_member_grant_sm` / `bw_member_revoke_sm` always return an error**
+  (`isError`) and send no request. The Public API neither returns nor
+  applies `accessSecretsManager`: grant reported success without effect,
+  revoke reported "already revoked" while access stayed. Secrets Manager
+  access is changed in the web vault / admin console. Both tools stay
+  registered with unchanged parameters.
+- **`bw_member_invite`** no longer sends `accessSecretsManager` (the API
+  ignores it); `accessSecretsManager: true` now returns an error instead of
+  inviting the member without Secrets Manager access.
+- **`bw_license_*_update` tools now change the subscription.** They sent
+  `seatAdjustment` / `storageGbAdjustment` / `serviceAccountAdjustment`,
+  which the API does not know, so every call was a no-op reported as
+  success. The inputs stay deltas; the tools now GET the subscription, send
+  current + delta as the absolute total (`passwordManager.seats`,
+  `passwordManager.storage`, `secretsManager.seats`,
+  `secretsManager.serviceAccounts`), GET it again and return
+  `{field, before, requested, after, response}`. An adjustment of 0, a
+  resulting total below 1, a missing current value, or a read-back that
+  differs from the requested total return an error.
+- **HTTP retries only where repeating is safe.** 5xx responses and network
+  errors are retried only for GET (before: 5xx for every method, network
+  errors never). POST/PUT/PATCH/DELETE are sent once; on 5xx the error text
+  says the outcome is unknown. 429 is still retried for every method.
+  `Retry-After` now also accepts an HTTP-date and the wait is capped at
+  30 s (before: an HTTP-date caused an immediate retry, large values were
+  not capped).
+- **`bw_event_query`**: `ipAddress` (not a filter of the Public API; it was
+  ignored and all events in the window were returned) now returns an error,
+  and so does passing both `actingUserId` and `itemId` (the API silently
+  applied only `actingUserId`).
+
 ### Changed
 
 - Dependencies: `pino` 10, `@types/node` 22, `vitest` and

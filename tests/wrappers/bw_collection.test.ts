@@ -5,7 +5,8 @@ import {
   makeCollectionUpdateTool,
   makeCollectionDeleteTool,
 } from "../../src/tools/wrappers/bw_collection.js";
-import { textOf } from "../helpers.js";
+import { withConfirmGuard } from "../../src/tools/confirm.js";
+import { fakeApi, textOf } from "../helpers.js";
 
 function stubClient(handler: (m: string, p: string, opts?: any) => any) {
   return { request: vi.fn(async (m: string, p: string, opts?: any) => handler(m, p, opts)) };
@@ -65,29 +66,84 @@ describe("bw_collection_*", () => {
     expect(client.request).toHaveBeenCalled();
   });
 
-  it("update PUTs groups/users access body", async () => {
-    const client = stubClient((m, p, o) => {
-      expect(m).toBe("PUT");
-      expect(p).toBe("/public/collections/c1");
-      expect(o.body).toEqual({
-        externalId: "ext-1",
-        groups: [{ id: "g1", readOnly: false, hidePasswords: false, manage: true }],
-        users: [{ id: "u1", readOnly: true, hidePasswords: false, manage: false }],
-      });
-      return { status: 200, headers: new Headers(), body: {} };
-    });
-    await makeCollectionUpdateTool(client as any).handler({
+  it("update PUTs the groups access body", async () => {
+    const { client, calls } = fakeApi({ "PUT /public/collections/c1": {} });
+    await makeCollectionUpdateTool(client).handler({
       id: "c1",
       externalId: "ext-1",
       groups: [{ id: "g1", readOnly: false, hidePasswords: false, manage: true }],
-      users: [{ id: "u1", readOnly: true, hidePasswords: false, manage: false }],
     });
-    expect(client.request).toHaveBeenCalled();
+    expect(calls).toEqual([
+      {
+        method: "PUT",
+        path: "/public/collections/c1",
+        body: {
+          externalId: "ext-1",
+          groups: [{ id: "g1", readOnly: false, hidePasswords: false, manage: true }],
+        },
+      },
+    ]);
   });
 
   it("delete DELETEs", async () => {
     const client = stubClient(() => ({ status: 200, headers: new Headers(), body: undefined }));
     const res = await makeCollectionDeleteTool(client as any).handler({ id: "c1" });
     expect(textOf(res)).toContain("deleted");
+  });
+});
+
+describe("bw_collection_update keeps state for omitted fields", () => {
+  const current = {
+    id: "c1",
+    externalId: "ext-c",
+    groups: [{ id: "g1", readOnly: false, hidePasswords: false, manage: true }],
+  };
+
+  it("{id} only: keeps externalId from GET and does not send groups", async () => {
+    const { client, calls } = fakeApi({
+      "GET /public/collections/c1": current,
+      "PUT /public/collections/c1": current,
+    });
+    const res = await makeCollectionUpdateTool(client).handler({ id: "c1" });
+    expect(res.isError).toBeFalsy();
+    const put = calls.find((c) => c.method === "PUT");
+    expect(put?.body).toEqual({ externalId: "ext-c" });
+  });
+
+  it("non-empty users is rejected (no per-user access in the Public API), nothing is sent", async () => {
+    const { client, calls } = fakeApi({});
+    const res = await makeCollectionUpdateTool(client).handler({
+      id: "c1",
+      users: [{ id: "m1", readOnly: true }],
+    });
+    expect(res.isError).toBe(true);
+    expect(textOf(res)).toMatch(/users/);
+    expect(textOf(res)).toMatch(/bw_member_update/);
+    expect(calls).toEqual([]);
+  });
+
+  it("an empty users list is accepted and not sent", async () => {
+    const { client, calls } = fakeApi({ "PUT /public/collections/c1": {} });
+    await makeCollectionUpdateTool(client).handler({ id: "c1", externalId: null, users: [] });
+    expect(calls).toEqual([
+      { method: "PUT", path: "/public/collections/c1", body: { externalId: null } },
+    ]);
+  });
+
+  it("description no longer promises per-user access", () => {
+    const tool = makeCollectionUpdateTool(fakeApi({}).client);
+    expect(tool.description).not.toMatch(/groups and users/);
+  });
+
+  it("confirm preview shows the effective request and does not write", async () => {
+    const { client, calls } = fakeApi({ "GET /public/collections/c1": current });
+    const res = await withConfirmGuard(makeCollectionUpdateTool(client), true).handler({
+      id: "c1",
+    });
+    const text = textOf(res);
+    expect(text).toContain("PUT /public/collections/c1");
+    expect(text).toContain('"externalId": "ext-c"');
+    expect(text).toMatch(/groups.*not sent/i);
+    expect(calls.every((c) => c.method === "GET")).toBe(true);
   });
 });

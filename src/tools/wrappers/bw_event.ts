@@ -19,6 +19,9 @@ export function makeEventQueryTool(
       "Query the organization event log with optional filters (self-host). " +
       "Defaults to the last 24 hours when no start/end are provided. " +
       "Querying wider windows may produce very large responses. " +
+      "Use at most one of actingUserId / itemId (the API applies only one filter). " +
+      "ipAddress is not a filter of the Bitwarden Public API and is rejected; each returned " +
+      "event carries its own ipAddress field. " +
       "Auto-paginates with continuationToken.",
     inputSchema: {
       type: "object",
@@ -27,13 +30,29 @@ export function makeEventQueryTool(
         end: { type: "string", description: "ISO 8601, inclusive. Defaults to now." },
         actingUserId: { type: "string" },
         itemId: { type: "string" },
-        ipAddress: { type: "string" },
+        ipAddress: {
+          type: "string",
+          description: "Not supported by the Public API: passing it returns an error.",
+        },
       },
       additionalProperties: false,
     },
     annotations: readOnly,
     handler: async (input) => {
       try {
+        if (input.ipAddress !== undefined) {
+          throw new Error(
+            "ipAddress is not a filter of the Bitwarden Public API (it would be ignored and all " +
+              "events in the window returned). Query without it and check the ipAddress field " +
+              "of the returned events.",
+          );
+        }
+        if (input.actingUserId !== undefined && input.itemId !== undefined) {
+          throw new Error(
+            "Pass either actingUserId or itemId, not both: the Bitwarden Public API applies only " +
+              "one of them (actingUserId wins) and would silently ignore itemId.",
+          );
+        }
         const now = new Date();
         const defaultStart = new Date(now.getTime() - MS_PER_DAY);
 
@@ -48,7 +67,7 @@ export function makeEventQueryTool(
           start: effectiveStart,
           end: effectiveEnd,
         };
-        for (const k of ["actingUserId", "itemId", "ipAddress"]) {
+        for (const k of ["actingUserId", "itemId"]) {
           if (typeof input[k] === "string") query[k] = input[k] as string;
         }
 

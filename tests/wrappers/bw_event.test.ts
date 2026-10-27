@@ -87,3 +87,26 @@ describe("bw_event_query", () => {
     expect(parsed.note).toBeUndefined();
   });
 });
+
+describe("bw_event_query unsupported filters", () => {
+  it("ipAddress is rejected instead of returning unfiltered events", async () => {
+    const client = stubClient(() => ({ status: 200, headers: new Headers(), body: { data: [] } }));
+    const res = await makeEventQueryTool(client as any, limits).handler({
+      ipAddress: "203.0.113.7",
+    });
+    expect(res.isError).toBe(true);
+    expect(textOf(res)).toMatch(/ipAddress/);
+    expect(client.request).not.toHaveBeenCalled();
+  });
+
+  it("actingUserId together with itemId is rejected (the API applies only one)", async () => {
+    const client = stubClient(() => ({ status: 200, headers: new Headers(), body: { data: [] } }));
+    const res = await makeEventQueryTool(client as any, limits).handler({
+      actingUserId: "u1",
+      itemId: "i1",
+    });
+    expect(res.isError).toBe(true);
+    expect(textOf(res)).toMatch(/actingUserId.*itemId|itemId.*actingUserId/);
+    expect(client.request).not.toHaveBeenCalled();
+  });
+});

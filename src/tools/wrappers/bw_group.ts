@@ -1,4 +1,4 @@
-import type { ToolDef } from "../../types.js";
+import type { PlannedRequest, ToolDef } from "../../types.js";
 import type { BitwardenHttpClient } from "../../http/bitwarden-http-client.js";
 import { fetchAllPages } from "../../http/pagination.js";
 import { asToolError, jsonResult } from "../_error.js";
@@ -22,6 +22,15 @@ type Group = { id: string; name: string; [k: string]: unknown };
 const SLIM_GROUP_FIELDS = ["id", "name", "externalId"] as const;
 
 type GroupInclude = "collections" | "all";
+
+const ACCESS_ALL_REMOVED =
+  "accessAll is no longer supported by Bitwarden (removed from the Public API); " +
+  "grant access per collection via the collections parameter instead. Nothing was changed.";
+const accessAllSchema = {
+  type: "boolean",
+  default: false,
+  description: "Removed upstream: true is rejected with an error; false is ignored.",
+};
 
 export function makeGroupListTool(
   client: BitwardenHttpClient,
@@ -129,7 +138,7 @@ export function makeGroupCreateTool(client: BitwardenHttpClient): ToolDef {
       type: "object",
       properties: {
         name: { type: "string" },
-        accessAll: { type: "boolean", default: false },
+        accessAll: accessAllSchema,
         externalId: { type: ["string", "null"], default: null },
         collections: { type: "array", default: [], items: { type: "object" } },
       },
@@ -139,10 +148,10 @@ export function makeGroupCreateTool(client: BitwardenHttpClient): ToolDef {
     annotations: destructive,
     handler: async (input) => {
       try {
+        if (input.accessAll === true) throw new Error(ACCESS_ALL_REMOVED);
         const res = await client.request("POST", "/public/groups", {
           body: {
             name: requireString(input, "name"),
-            accessAll: input.accessAll ?? false,
             externalId: input.externalId ?? null,
             collections: input.collections ?? [],
           },
@@ -155,34 +164,57 @@ export function makeGroupCreateTool(client: BitwardenHttpClient): ToolDef {
   };
 }
 
+/**
+ * PUT /public/groups/{id} writes name and externalId from the body and keeps
+ * the collection assignments when `collections` is absent. So: omit
+ * collections unless given, and keep externalId from the current group (GET).
+ */
+async function planGroupUpdate(
+  client: BitwardenHttpClient,
+  input: Record<string, unknown>,
+): Promise<PlannedRequest> {
+  const id = requireString(input, "id");
+  const name = requireString(input, "name");
+  if (input.accessAll === true) throw new Error(ACCESS_ALL_REMOVED);
+  const path = `/public/groups/${encodeURIComponent(id)}`;
+  const notes: string[] = [];
+  let externalId = input.externalId;
+  if (!("externalId" in input)) {
+    const current = (await client.request<Record<string, unknown>>("GET", path)).body ?? {};
+    externalId = current.externalId ?? null;
+    notes.push("externalId kept from the current group.");
+  }
+  const body: Record<string, unknown> = { name, externalId };
+  if ("collections" in input) body.collections = input.collections;
+  else notes.push("collections not sent, so the group's collection access stays unchanged.");
+  return { method: "PUT", path, body, notes };
+}
+
 export function makeGroupUpdateTool(client: BitwardenHttpClient): ToolDef {
   return {
     name: "bw_group_update",
-    description: "Update a group's name / access / collections (self-host). Destructive.",
+    description:
+      "Update a group's name, externalId and collection access (self-host). Omitted optional " +
+      "fields keep their current value; passing collections replaces the group's whole " +
+      "collection list. accessAll is no longer supported by Bitwarden (true is rejected). Destructive.",
     inputSchema: {
       type: "object",
       properties: {
         id: { type: "string" },
         name: { type: "string" },
-        accessAll: { type: "boolean", default: false },
-        externalId: { type: ["string", "null"], default: null },
-        collections: { type: "array", default: [], items: { type: "object" } },
+        accessAll: accessAllSchema,
+        externalId: { type: ["string", "null"] },
+        collections: { type: "array", items: { type: "object" } },
       },
       required: ["id", "name"],
       additionalProperties: false,
     },
     annotations: destructive,
+    plan: (input) => planGroupUpdate(client, input),
     handler: async (input) => {
       try {
-        const id = requireString(input, "id");
-        const res = await client.request("PUT", `/public/groups/${encodeURIComponent(id)}`, {
-          body: {
-            name: requireString(input, "name"),
-            accessAll: input.accessAll ?? false,
-            externalId: input.externalId ?? null,
-            collections: input.collections ?? [],
-          },
-        });
+        const plan = await planGroupUpdate(client, input);
+        const res = await client.request(plan.method, plan.path, { body: plan.body });
         return jsonResult(res.body ?? null);
       } catch (err) {
         return asToolError(err);

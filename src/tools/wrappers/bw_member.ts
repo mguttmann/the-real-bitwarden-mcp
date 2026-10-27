@@ -1,4 +1,4 @@
-import type { ToolDef } from "../../types.js";
+import type { PlannedRequest, ToolDef } from "../../types.js";
 import type { BitwardenHttpClient } from "../../http/bitwarden-http-client.js";
 import { fetchAllPages } from "../../http/pagination.js";
 import { asToolError, jsonResult } from "../_error.js";
@@ -27,12 +27,16 @@ type Member = {
  * org sizes (~200 members, ~60 collections).
  *
  * Note: `accessSecretsManager` is intentionally NOT in this list. Bitwarden's
- * Public API exposes the field as write-only — it is accepted by POST/PUT
- * /public/members but is never present in GET responses (verified live
- * against 2026.4.x self-host). Reading SM-access status per user is not
- * possible via the Public API.
+ * Public API neither returns it in GET responses nor applies it on POST/PUT
+ * /public/members (the server keeps the stored value). Secrets Manager access
+ * per user can only be read and changed in the web vault.
  */
 const SLIM_MEMBER_FIELDS = ["id", "email", "name", "type", "status", "twoFactorEnabled"] as const;
+
+const SM_NOT_SUPPORTED =
+  "Secrets Manager access per member is not supported by the Bitwarden Public API: " +
+  "accessSecretsManager is neither returned nor applied by /public/members. " +
+  "Change it in the web vault / admin console (Members > member > Secrets Manager). Nothing was changed.";
 
 type MemberInclude = "collections" | "groups" | "permissions" | "all";
 
@@ -46,8 +50,8 @@ export function makeMemberListTool(
     description:
       "List organization members (self-host). Returns slim projection by default " +
       "(id, email, name, type, status, twoFactorEnabled). " +
-      "Note: accessSecretsManager is write-only in Bitwarden's Public API and " +
-      "cannot be read back per user — set it via bw_member_grant_sm / bw_member_revoke_sm. " +
+      "Note: Secrets Manager access per member is not exposed by Bitwarden's Public API " +
+      "(neither readable nor writable); use the web vault for it. " +
       "For collections/groups of a member, use bw_member_get / bw_member_get_groups. " +
       "Pass include: ['collections','groups','all'] for the full nested response " +
       "(may be very large). Auto-paginates with continuationToken; supports optional " +
@@ -165,7 +169,12 @@ export function makeMemberInviteTool(client: BitwardenHttpClient): ToolDef {
         externalId: { type: ["string", "null"], default: null },
         collections: { type: "array", default: [], items: { type: "object" } },
         groups: { type: "array", default: [], items: { type: "string" } },
-        accessSecretsManager: { type: "boolean", default: false },
+        accessSecretsManager: {
+          type: "boolean",
+          default: false,
+          description:
+            "Not supported by the Bitwarden Public API: true is rejected. Grant Secrets Manager access in the web vault.",
+        },
       },
       required: ["email", "type"],
       additionalProperties: false,
@@ -173,6 +182,7 @@ export function makeMemberInviteTool(client: BitwardenHttpClient): ToolDef {
     annotations: destructive,
     handler: async (input) => {
       try {
+        if (input.accessSecretsManager === true) throw new Error(SM_NOT_SUPPORTED);
         const res = await client.request("POST", "/public/members", {
           body: {
             email: requireString(input, "email"),
@@ -180,7 +190,6 @@ export function makeMemberInviteTool(client: BitwardenHttpClient): ToolDef {
             externalId: input.externalId ?? null,
             collections: input.collections ?? [],
             groups: input.groups ?? [],
-            accessSecretsManager: input.accessSecretsManager ?? false,
           },
         });
         return jsonResult(res.body ?? null);
@@ -191,34 +200,79 @@ export function makeMemberInviteTool(client: BitwardenHttpClient): ToolDef {
   };
 }
 
+const MEMBER_CUSTOM_TYPE = 4;
+
+function collectionAccess(entries: unknown): unknown[] {
+  if (!Array.isArray(entries)) return [];
+  return entries.map((c: Record<string, unknown>) => ({
+    id: c.id,
+    readOnly: c.readOnly,
+    hidePasswords: c.hidePasswords,
+    manage: c.manage,
+  }));
+}
+
+/**
+ * PUT /public/members/{id} resets externalId, direct collection access and
+ * custom permissions to whatever the body carries, but keeps group
+ * memberships when `groups` is absent. So: omit groups unless given, and
+ * fill the other omitted fields from the current member (GET) instead of
+ * sending null / [].
+ */
+async function planMemberUpdate(
+  client: BitwardenHttpClient,
+  input: Record<string, unknown>,
+): Promise<PlannedRequest> {
+  const id = requireString(input, "id");
+  const path = `/public/members/${encodeURIComponent(id)}`;
+  const type = input.type;
+  const needsCurrent =
+    !("externalId" in input) || !("collections" in input) || type === MEMBER_CUSTOM_TYPE;
+  const current = needsCurrent
+    ? ((await client.request<Record<string, unknown>>("GET", path)).body ?? {})
+    : {};
+  const body: Record<string, unknown> = {
+    type,
+    externalId: "externalId" in input ? input.externalId : (current.externalId ?? null),
+    collections: "collections" in input ? input.collections : collectionAccess(current.collections),
+  };
+  const notes: string[] = [];
+  if (!("externalId" in input)) notes.push("externalId kept from the current member.");
+  if (!("collections" in input)) notes.push("collections kept from the current member.");
+  if (type === MEMBER_CUSTOM_TYPE && current.type === MEMBER_CUSTOM_TYPE && current.permissions) {
+    body.permissions = current.permissions;
+    notes.push("custom permissions kept from the current member.");
+  }
+  if ("groups" in input) body.groups = input.groups;
+  else notes.push("groups not sent, so group memberships stay unchanged.");
+  return { method: "PUT", path, body, notes };
+}
+
 export function makeMemberUpdateTool(client: BitwardenHttpClient): ToolDef {
   return {
     name: "bw_member_update",
-    description: "Update an organization member's role and access (self-host). Destructive.",
+    description:
+      "Update an organization member's role and access (self-host). Omitted optional fields keep " +
+      "their current value (externalId and collections are read from the member first; groups are " +
+      "left unchanged). Passing collections or groups replaces that whole list. Destructive.",
     inputSchema: {
       type: "object",
       properties: {
         id: { type: "string" },
         type: { type: "integer", enum: [0, 1, 2, 3, 4] },
-        externalId: { type: ["string", "null"], default: null },
-        collections: { type: "array", default: [], items: { type: "object" } },
-        groups: { type: "array", default: [], items: { type: "string" } },
+        externalId: { type: ["string", "null"] },
+        collections: { type: "array", items: { type: "object" } },
+        groups: { type: "array", items: { type: "string" } },
       },
       required: ["id", "type"],
       additionalProperties: false,
     },
     annotations: destructive,
+    plan: (input) => planMemberUpdate(client, input),
     handler: async (input) => {
       try {
-        const id = requireString(input, "id");
-        const res = await client.request("PUT", `/public/members/${encodeURIComponent(id)}`, {
-          body: {
-            type: input.type,
-            externalId: input.externalId ?? null,
-            collections: input.collections ?? [],
-            groups: input.groups ?? [],
-          },
-        });
+        const plan = await planMemberUpdate(client, input);
+        const res = await client.request(plan.method, plan.path, { body: plan.body });
         return jsonResult(res.body ?? null);
       } catch (err) {
         return asToolError(err);
@@ -335,61 +389,10 @@ export function makeMemberSetGroupsTool(client: BitwardenHttpClient): ToolDef {
   };
 }
 
-// Helper: shape used by the PUT body — derived from the current member state
-function buildUpdateBody(
-  current: Record<string, unknown>,
-  groupIds: string[],
-  accessSecretsManager: boolean,
-): Record<string, unknown> {
+function smUnsupportedTool(name: string, description: string): ToolDef {
   return {
-    type: current.type,
-    externalId: current.externalId ?? null,
-    collections: (current.collections as unknown[]) ?? [],
-    groups: groupIds,
-    accessSecretsManager,
-    // Preserve any permissions / resetPasswordEnrolled flags that came back from GET
-    ...(current.permissions !== undefined ? { permissions: current.permissions } : {}),
-    ...(current.resetPasswordEnrolled !== undefined
-      ? { resetPasswordEnrolled: current.resetPasswordEnrolled }
-      : {}),
-  };
-}
-
-async function setMemberSm(
-  client: BitwardenHttpClient,
-  id: string,
-  enabled: boolean,
-): Promise<{
-  previous: boolean | undefined;
-  current: boolean;
-  member: unknown;
-}> {
-  const get = await client.request<Record<string, unknown>>(
-    "GET",
-    `/public/members/${encodeURIComponent(id)}`,
-  );
-  const current = get.body ?? {};
-  const previousAccess = current.accessSecretsManager === true;
-  if (previousAccess === enabled) {
-    return { previous: previousAccess, current: enabled, member: current };
-  }
-  // Fetch current group ids since GET /public/members/{id} does NOT include them
-  const groupsRes = await client.request<string[]>(
-    "GET",
-    `/public/members/${encodeURIComponent(id)}/group-ids`,
-  );
-  const groupIds = groupsRes.body ?? [];
-  const put = await client.request("PUT", `/public/members/${encodeURIComponent(id)}`, {
-    body: buildUpdateBody(current, groupIds, enabled),
-  });
-  return { previous: previousAccess, current: enabled, member: put.body };
-}
-
-export function makeMemberGrantSmTool(client: BitwardenHttpClient): ToolDef {
-  return {
-    name: "bw_member_grant_sm",
-    description:
-      "Grant a member access to Secrets Manager (self-host). Wraps PUT /public/members/{id} with accessSecretsManager:true. Idempotent: if already granted, returns immediately without writing. Bitwarden will return a 400 if no SM seats are available — check bw_license_subscription_get first.",
+    name,
+    description,
     inputSchema: {
       type: "object",
       properties: { id: { type: "string" } },
@@ -397,50 +400,25 @@ export function makeMemberGrantSmTool(client: BitwardenHttpClient): ToolDef {
       additionalProperties: false,
     },
     annotations: destructive,
-    handler: async (input) => {
-      try {
-        const id = requireString(input, "id");
-        const result = await setMemberSm(client, id, true);
-        return jsonResult({
-          id,
-          previousAccessSecretsManager: result.previous,
-          currentAccessSecretsManager: result.current,
-          changed: result.previous !== result.current,
-          member: result.member,
-        });
-      } catch (err) {
-        return asToolError(err);
-      }
+    plan: async () => {
+      throw new Error(SM_NOT_SUPPORTED);
     },
+    handler: async () => asToolError(new Error(SM_NOT_SUPPORTED)),
   };
 }
 
-export function makeMemberRevokeSmTool(client: BitwardenHttpClient): ToolDef {
-  return {
-    name: "bw_member_revoke_sm",
-    description:
-      "Revoke a member's Secrets Manager access (self-host). Wraps PUT /public/members/{id} with accessSecretsManager:false. Idempotent: if already revoked, returns immediately without writing.",
-    inputSchema: {
-      type: "object",
-      properties: { id: { type: "string" } },
-      required: ["id"],
-      additionalProperties: false,
-    },
-    annotations: destructive,
-    handler: async (input) => {
-      try {
-        const id = requireString(input, "id");
-        const result = await setMemberSm(client, id, false);
-        return jsonResult({
-          id,
-          previousAccessSecretsManager: result.previous,
-          currentAccessSecretsManager: result.current,
-          changed: result.previous !== result.current,
-          member: result.member,
-        });
-      } catch (err) {
-        return asToolError(err);
-      }
-    },
-  };
+export function makeMemberGrantSmTool(_client: BitwardenHttpClient): ToolDef {
+  return smUnsupportedTool(
+    "bw_member_grant_sm",
+    "Not supported: always returns an error. Bitwarden's Public API cannot grant Secrets Manager " +
+      "access to a member; use the web vault / admin console. Kept registered for compatibility.",
+  );
+}
+
+export function makeMemberRevokeSmTool(_client: BitwardenHttpClient): ToolDef {
+  return smUnsupportedTool(
+    "bw_member_revoke_sm",
+    "Not supported: always returns an error. Bitwarden's Public API cannot revoke Secrets Manager " +
+      "access of a member; use the web vault / admin console. Kept registered for compatibility.",
+  );
 }

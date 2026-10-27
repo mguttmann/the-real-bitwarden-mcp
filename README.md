@@ -56,18 +56,17 @@ Uses the Organization Public-API key (`organization.<uuid>` /
 client_credentials / scope `api.organization`).
 
 - List, get, invite, update, remove organization members
-- **Grant or revoke a member's Secrets Manager access** (`bw_member_grant_sm`,
-  `bw_member_revoke_sm`)
 - Create, update, delete groups; manage group membership
-- Update collection access (groups / users with read / hide-passwords / manage)
+- Update collection access per group (read / hide-passwords / manage);
+  omitted fields of update tools keep their current value
 - Read, set organization policies
 - Query the event log
 - Bulk-import groups + members
 - Read full subscription details (PM seats, SM seats, storage,
   service-account slots)
 - Adjust PM seats, PM storage, SM seats, SM service-account slots via the
-  unified `PUT /public/organization/subscription` endpoint — positive delta
-  to add, negative to remove
+  unified `PUT /public/organization/subscription` endpoint: the tools take a
+  delta, send current + delta as the new total and read it back
 - Cloud-only: license inspection on the cloud organization
 
 ### Can — Secrets Manager (via the official Bitwarden SDK)
@@ -90,10 +89,14 @@ Bitwarden's APIs do not expose these. The SDK doesn't either.
 - List all Machine Accounts in the organization (Machine Accounts cannot
   enumerate each other; security model)
 - Trigger a Cloud → Self-Host license re-sync
-- **Read** a member's `accessSecretsManager` flag. Bitwarden's Public API
-  exposes this field as write-only — you can set it via
-  `bw_member_grant_sm` / `bw_member_revoke_sm`, but `bw_member_list` and
-  `bw_member_get` never return it.
+- **Read, grant or revoke** a member's Secrets Manager access. Bitwarden's
+  Public API neither returns nor applies `accessSecretsManager`;
+  `bw_member_grant_sm` / `bw_member_revoke_sm` stay registered but always
+  return an error.
+- Per-user collection access (`bw_collection_update` rejects a non-empty
+  `users` list; give members direct access via `bw_member_update`
+  `collections`), group `accessAll` (removed upstream), and filtering events
+  by IP address.
 
 For all of these: use the web vault at `https://<your-host>/#/sm/{orgId}/`.
 
@@ -322,6 +325,7 @@ A short list:
 - `bw_member_list`, `bw_member_get`, `bw_member_invite`, `bw_member_update`,
   `bw_member_remove`, `bw_member_reinvite`, `bw_member_get_groups`,
   `bw_member_set_groups`, `bw_member_grant_sm`, `bw_member_revoke_sm`
+  (the last two always return an error, see "Cannot")
 - `bw_group_list`, `bw_group_get`, `bw_group_create`, `bw_group_update`,
   `bw_group_delete`, `bw_group_get_members`, `bw_group_set_members`
 - `bw_collection_list`, `bw_collection_get`, `bw_collection_update`,
@@ -339,10 +343,15 @@ A short list:
 ### License / subscription (cloud)
 
 - `bw_license_subscription_get`
-- `bw_license_seats_update` — adjusts Password Manager seats via unified subscription endpoint
-- `bw_license_storage_update` — adjusts Password Manager storage via unified subscription endpoint
-- `bw_license_sm_seats_update` — adjusts Secrets Manager seats via unified subscription endpoint
-- `bw_license_sm_service_accounts_update` — adjusts Secrets Manager service-account slots via unified subscription endpoint
+- `bw_license_seats_update`: adjusts Password Manager seats (`passwordManager.seats`)
+- `bw_license_storage_update`: adjusts Password Manager storage (`passwordManager.storage`)
+- `bw_license_sm_seats_update`: adjusts Secrets Manager seats (`secretsManager.seats`)
+- `bw_license_sm_service_accounts_update`: adjusts Secrets Manager service-account slots
+  (`secretsManager.serviceAccounts`)
+
+All four take a delta, send current + delta as the new absolute total through
+`PUT /public/organization/subscription`, read the subscription back and return
+an error if the total did not change.
 
 ### Secrets Manager — SDK-backed (require `BWS_ACCESS_TOKEN` + supported platform)
 

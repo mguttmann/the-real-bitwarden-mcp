@@ -1,4 +1,4 @@
-import type { ToolDef } from "../../types.js";
+import type { PlannedRequest, ToolDef } from "../../types.js";
 import type { BitwardenHttpClient } from "../../http/bitwarden-http-client.js";
 import { fetchAllPages } from "../../http/pagination.js";
 import { asToolError, jsonResult } from "../_error.js";
@@ -127,33 +127,65 @@ export function makeCollectionGetTool(client: BitwardenHttpClient): ToolDef {
   };
 }
 
+const USERS_NOT_SUPPORTED =
+  "users is not supported: the Bitwarden Public API has no per-user collection access; a collection update only " +
+  "takes externalId and groups. Give a member direct access with bw_member_update " +
+  "(collections), or use groups. Nothing was changed.";
+
+/**
+ * PUT /public/collections/{id} writes externalId from the body and keeps the
+ * group access when `groups` is absent. So: omit groups unless given, and
+ * keep externalId from the current collection (GET).
+ */
+async function planCollectionUpdate(
+  client: BitwardenHttpClient,
+  input: Record<string, unknown>,
+): Promise<PlannedRequest> {
+  const id = requireString(input, "id");
+  if (Array.isArray(input.users) && input.users.length > 0) throw new Error(USERS_NOT_SUPPORTED);
+  const path = `/public/collections/${encodeURIComponent(id)}`;
+  const notes: string[] = [];
+  let externalId = input.externalId;
+  if (!("externalId" in input)) {
+    const current = (await client.request<Record<string, unknown>>("GET", path)).body ?? {};
+    externalId = current.externalId ?? null;
+    notes.push("externalId kept from the current collection.");
+  }
+  const body: Record<string, unknown> = { externalId };
+  if ("groups" in input) body.groups = input.groups;
+  else notes.push("groups not sent, so the collection's group access stays unchanged.");
+  return { method: "PUT", path, body, notes };
+}
+
 export function makeCollectionUpdateTool(client: BitwardenHttpClient): ToolDef {
   return {
     name: "bw_collection_update",
     description:
-      "Update a collection's access — groups and users with readOnly / hidePasswords / manage flags (self-host). Destructive.",
+      "Update a collection's externalId and group access (readOnly / hidePasswords / manage per " +
+      "group) (self-host). Omitted optional fields keep their current value; passing groups " +
+      "replaces the whole group list. The Public API has no per-user collection access: a " +
+      "non-empty users list is rejected (use bw_member_update collections). Destructive.",
     inputSchema: {
       type: "object",
       properties: {
         id: { type: "string" },
-        externalId: { type: ["string", "null"], default: null },
-        groups: { type: "array", items: accessEntrySchema, default: [] },
-        users: { type: "array", items: accessEntrySchema, default: [] },
+        externalId: { type: ["string", "null"] },
+        groups: { type: "array", items: accessEntrySchema },
+        users: {
+          type: "array",
+          items: accessEntrySchema,
+          description: "Not supported by the Public API: a non-empty list is rejected.",
+        },
       },
       required: ["id"],
       additionalProperties: false,
     },
     annotations: destructive,
+    plan: (input) => planCollectionUpdate(client, input),
     handler: async (input) => {
       try {
-        const id = requireString(input, "id");
-        const res = await client.request("PUT", `/public/collections/${encodeURIComponent(id)}`, {
-          body: {
-            externalId: input.externalId ?? null,
-            groups: input.groups ?? [],
-            users: input.users ?? [],
-          },
-        });
+        const plan = await planCollectionUpdate(client, input);
+        const res = await client.request(plan.method, plan.path, { body: plan.body });
         return jsonResult(res.body ?? null);
       } catch (err) {
         return asToolError(err);

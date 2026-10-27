@@ -1,5 +1,5 @@
 import type { OAuthTokenCache } from "./oauth-token-cache.js";
-import { mapErrorResponse } from "./errors.js";
+import { BitwardenApiError, mapErrorResponse } from "./errors.js";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export type RequestOptions = {
@@ -24,6 +24,10 @@ export type BitwardenHttpClientOptions = {
 };
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RETRIES = 3;
+const MAX_RETRY_AFTER_MS = 30_000;
+// Only these may be repeated after a 5xx or a network error: a write may
+// already have been applied upstream. 429 is retried for every method.
+const IDEMPOTENT_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD"]);
 const defaultSleep: SleepFn = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export class BitwardenHttpClient {
@@ -49,19 +53,36 @@ export class BitwardenHttpClient {
     options: RequestOptions = {},
   ): Promise<HttpResponse<T>> {
     const maxRetries = options.maxRetries ?? this.defaultMaxRetries;
+    const idempotent = IDEMPOTENT_METHODS.has(method);
     let attempt = 0;
     let tokenRefreshed = false;
     while (true) {
       const token = await this.tokenCache.getToken();
-      const res = await this.doFetch<T>(method, path, options, token);
+      let res: HttpResponse<T>;
+      try {
+        res = await this.doFetch<T>(method, path, options, token);
+      } catch (err) {
+        if (!idempotent || attempt >= maxRetries) throw err;
+        await this.sleep(1000 * 2 ** attempt);
+        attempt++;
+        continue;
+      }
       if (res.status === 401 && !tokenRefreshed) {
         this.tokenCache.invalidate();
         tokenRefreshed = true;
         continue;
       }
-      const delay = this.computeRetryDelay(res.status, res.headers, attempt);
+      const delay = this.computeRetryDelay(res.status, res.headers, attempt, idempotent);
       if (delay === null || attempt >= maxRetries) {
         const err = mapErrorResponse(res.status, res.body);
+        if (err && !idempotent && res.status >= 500) {
+          throw new BitwardenApiError(
+            err.status,
+            err.code,
+            `${err.message} (${method} not retried: the request may or may not have been applied upstream; check the current state before repeating it)`,
+            err.details,
+          );
+        }
         if (err) throw err;
         return res;
       }
@@ -100,13 +121,17 @@ export class BitwardenHttpClient {
     }
   }
 
-  private computeRetryDelay(status: number, headers: Headers, attempt: number): number | null {
+  private computeRetryDelay(
+    status: number,
+    headers: Headers,
+    attempt: number,
+    idempotent: boolean,
+  ): number | null {
     if (status === 429) {
-      const retryAfter = headers.get("retry-after");
-      const retryAfterMs = retryAfter ? Number(retryAfter) * 1000 : 0;
-      return Math.max(retryAfterMs, 1000 * 2 ** attempt);
+      const retryAfterMs = parseRetryAfter(headers.get("retry-after"));
+      return Math.min(Math.max(retryAfterMs, 1000 * 2 ** attempt), MAX_RETRY_AFTER_MS);
     }
-    if (status >= 500 && status < 600) return 1000 * 2 ** attempt;
+    if (idempotent && status >= 500 && status < 600) return 1000 * 2 ** attempt;
     return null;
   }
 
@@ -131,4 +156,12 @@ export class BitwardenHttpClient {
       return text as unknown as T;
     }
   }
+}
+
+/** Retry-After as delta-seconds or HTTP-date, in ms; 0 when absent, invalid or in the past. */
+function parseRetryAfter(value: string | null): number {
+  if (!value) return 0;
+  const trimmed = value.trim();
+  const ms = /^\d+$/.test(trimmed) ? Number(trimmed) * 1000 : Date.parse(trimmed) - Date.now();
+  return Number.isFinite(ms) && ms > 0 ? ms : 0;
 }

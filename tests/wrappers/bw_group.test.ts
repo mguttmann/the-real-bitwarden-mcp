@@ -8,7 +8,8 @@ import {
   makeGroupGetMembersTool,
   makeGroupSetMembersTool,
 } from "../../src/tools/wrappers/bw_group.js";
-import { textOf } from "../helpers.js";
+import { withConfirmGuard } from "../../src/tools/confirm.js";
+import { fakeApi, textOf } from "../helpers.js";
 
 function stubClient(handler: (m: string, p: string, opts?: any) => any) {
   return { request: vi.fn(async (m: string, p: string, opts?: any) => handler(m, p, opts)) };
@@ -71,23 +72,12 @@ describe("bw_group_*", () => {
       expect(p).toBe("/public/groups");
       expect(o.body).toEqual({
         name: "Eng",
-        accessAll: false,
         externalId: null,
         collections: [],
       });
       return { status: 200, headers: new Headers(), body: { id: "new" } };
     });
     await makeGroupCreateTool(client as any).handler({ name: "Eng" });
-    expect(client.request).toHaveBeenCalled();
-  });
-
-  it("update PUTs", async () => {
-    const client = stubClient((m, p) => {
-      expect(m).toBe("PUT");
-      expect(p).toBe("/public/groups/g1");
-      return { status: 200, headers: new Headers(), body: {} };
-    });
-    await makeGroupUpdateTool(client as any).handler({ id: "g1", name: "Eng2" });
     expect(client.request).toHaveBeenCalled();
   });
 
@@ -121,5 +111,74 @@ describe("bw_group_*", () => {
     const client = stubClient(() => ({ status: 200, headers: new Headers(), body: { id: "g1" } }));
     const res = await makeGroupGetTool(client as any).handler({ id: "g1" });
     expect(textOf(res)).toContain("g1");
+  });
+});
+
+describe("bw_group_update keeps state for omitted fields", () => {
+  const current = {
+    id: "g1",
+    name: "Eng",
+    externalId: "ext-g",
+    collections: [{ id: "c1", readOnly: false, hidePasswords: false, manage: true }],
+  };
+
+  it("rename only: keeps externalId from GET, omits collections and accessAll", async () => {
+    const { client, calls } = fakeApi({
+      "GET /public/groups/g1": current,
+      "PUT /public/groups/g1": { id: "g1", name: "Renamed" },
+    });
+    const res = await makeGroupUpdateTool(client).handler({ id: "g1", name: "Renamed" });
+    expect(res.isError).toBeFalsy();
+    const put = calls.find((c) => c.method === "PUT");
+    expect(put?.body).toEqual({ name: "Renamed", externalId: "ext-g" });
+  });
+
+  it("sends externalId and collections as given, without a GET", async () => {
+    const { client, calls } = fakeApi({ "PUT /public/groups/g1": { id: "g1" } });
+    await makeGroupUpdateTool(client).handler({
+      id: "g1",
+      name: "Eng",
+      externalId: null,
+      collections: [],
+    });
+    expect(calls).toEqual([
+      {
+        method: "PUT",
+        path: "/public/groups/g1",
+        body: { name: "Eng", externalId: null, collections: [] },
+      },
+    ]);
+  });
+
+  it("accessAll:true is rejected (removed upstream), nothing is sent", async () => {
+    const { client, calls } = fakeApi({});
+    const res = await makeGroupUpdateTool(client).handler({
+      id: "g1",
+      name: "Eng",
+      accessAll: true,
+    });
+    expect(res.isError).toBe(true);
+    expect(textOf(res)).toMatch(/accessAll/);
+    expect(calls).toEqual([]);
+  });
+
+  it("bw_group_create rejects accessAll:true as well", async () => {
+    const { client, calls } = fakeApi({});
+    const res = await makeGroupCreateTool(client).handler({ name: "Eng", accessAll: true });
+    expect(res.isError).toBe(true);
+    expect(calls).toEqual([]);
+  });
+
+  it("confirm preview shows the effective request and does not write", async () => {
+    const { client, calls } = fakeApi({ "GET /public/groups/g1": current });
+    const res = await withConfirmGuard(makeGroupUpdateTool(client), true).handler({
+      id: "g1",
+      name: "Renamed",
+    });
+    const text = textOf(res);
+    expect(text).toContain("PUT /public/groups/g1");
+    expect(text).toContain('"externalId": "ext-g"');
+    expect(text).toMatch(/collections.*not sent/i);
+    expect(calls.every((c) => c.method === "GET")).toBe(true);
   });
 });
