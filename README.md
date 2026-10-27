@@ -303,8 +303,8 @@ For per-item details, use the dedicated detail endpoints
 `bw_member_get_groups`, `bw_group_get_members`).
 
 A response-size guard adds a `note` field to any list response that exceeds
-`BW_MCP_MAX_LIST_RESPONSE_BYTES` (default 60 000 chars). The response is
-still returned in full; nothing is truncated silently.
+`BW_MCP_MAX_LIST_RESPONSE_BYTES` characters (default in the table above). The
+response is still returned in full; nothing is truncated silently.
 
 ## Running
 

@@ -29,8 +29,8 @@ const accessEntrySchema = {
 /**
  * Default response is slim because Bitwarden public API embeds the full
  * permission graph in each list item, which inflates the response by a
- * factor of 5–10x and overruns LLM tool-call token budgets at modest
- * org sizes (~200 members, ~60 collections).
+ * large factor and overruns LLM tool-call token budgets even for
+ * organizations of modest size.
  */
 const SLIM_COLLECTION_FIELDS = ["id", "externalId"] as const;
 
@@ -199,7 +199,7 @@ export function makeCollectionDeleteTool(client: BitwardenHttpClient): ToolDef {
   return {
     name: "bw_collection_delete",
     description:
-      "Delete a collection (self-host). Highly destructive — items in this collection lose access.",
+      "Delete a collection (self-host). Highly destructive - items in this collection lose access.",
     inputSchema: {
       type: "object",
       properties: { id: { type: "string" } },

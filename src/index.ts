@@ -239,7 +239,7 @@ export function buildRegistry(config: Config, clients: Clients): ToolRegistry {
     "Secrets Manager not configured. Set BWS_ACCESS_TOKEN (and BWS_API_BASE/IDENTITY_URL if not inherited from self-host) in .env, then restart.";
 
   if (config.sm) {
-    // SM is configured — register SDK-backed project/secret tools (may be undefined if SDK failed to load)
+    // SM is configured - register SDK-backed project/secret tools (may be undefined if SDK failed to load)
     const sdk = clients.smSdk;
     const orgId = config.sm.orgId;
 

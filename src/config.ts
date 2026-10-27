@@ -34,7 +34,7 @@ export type CloudConfig = {
  * - accessTokenUuid  → OAuth client_id sent to /connect/token
  * - clientSecret     → OAuth client_secret sent to /connect/token
  * - encryptionKey    → stays CLIENT-SIDE, used to decrypt encrypted_payload
- *                      in the identity response — NEVER sent to the server
+ *                      in the identity response - NEVER sent to the server
  *
  * scope used for SM OAuth requests: api.secrets
  */
@@ -160,14 +160,14 @@ function loadCloud(env: Env): CloudConfig | undefined {
  * Expected format:  0.{uuid}.{clientSecret}:{encryptionKey}
  *
  * The split rules are:
- *   1. Split on the LAST `:` — left side is the OAuth portion, right side is
+ *   1. Split on the LAST `:` - left side is the OAuth portion, right side is
  *      the encryption key (which stays client-side and is never sent to the
  *      identity server).
- *   2. Split the OAuth portion on `.` — must yield exactly 3 segments:
+ *   2. Split the OAuth portion on `.` - must yield exactly 3 segments:
  *      ["0", uuid, clientSecret].
  *
  * Common mistake: using the full raw token or the encryption key as
- * `client_secret` — the identity server will respond with `invalid_client`.
+ * `client_secret` - the identity server will respond with `invalid_client`.
  */
 export function parseBwsToken(raw: string): ParsedBwsToken {
   const colonIdx = raw.lastIndexOf(":");

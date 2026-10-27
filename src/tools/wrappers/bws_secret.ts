@@ -20,7 +20,7 @@ export function makeSecretListTool(
   return {
     name: "bws_secret_list",
     description:
-      "List Secrets Manager secrets in the organization. Returns METADATA ONLY (id, key, organizationId) — no value field. Use bws_secret_get_value(id) to read a single value.",
+      "List Secrets Manager secrets in the organization. Returns METADATA ONLY (id, key, organizationId) - no value field. Use bws_secret_get_value(id) to read a single value.",
     inputSchema: {
       type: "object",
       properties: { organizationId: { type: "string" } },
@@ -41,12 +41,12 @@ export function makeSecretListTool(
 }
 
 export function makeSecretGetValueTool(sdk: SmSdkClient | undefined): ToolDef {
-  // Intentionally readOnlyHint:true — confirm gate would add friction without value.
+  // Intentionally readOnlyHint:true - confirm gate would add friction without value.
   // Defence-in-depth lives elsewhere: bulk listing returns identifiers only, logger redacts the field.
   return {
     name: "bws_secret_get_value",
     description:
-      "Fetch a single Secrets Manager secret by id, including its decrypted value. Use sparingly — the value is returned in the response. Never log the response output.",
+      "Fetch a single Secrets Manager secret by id, including its decrypted value. Use sparingly - the value is returned in the response. Never log the response output.",
     inputSchema: {
       type: "object",
       properties: { id: { type: "string" } },

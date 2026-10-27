@@ -38,7 +38,7 @@ export function makeHelpTool(registry: ToolRegistry): ToolDef {
       for (const [category, tools] of groups) {
         if (tools.length === 0) continue;
         lines.push(`## ${GROUP_TITLES[category]}`);
-        for (const tool of tools) lines.push(`- \`${tool.name}\` — ${tool.description}`);
+        for (const tool of tools) lines.push(`- \`${tool.name}\` - ${tool.description}`);
         lines.push("");
       }
       return { content: [{ type: "text", text: lines.join("\n").trimEnd() }] };

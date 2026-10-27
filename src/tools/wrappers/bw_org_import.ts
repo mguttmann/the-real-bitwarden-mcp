@@ -7,7 +7,7 @@ export function makeOrgImportTool(client: BitwardenHttpClient): ToolDef {
   return {
     name: "bw_org_import",
     description:
-      "Bulk import groups and members into the organization (self-host). HIGHLY destructive — overwriteExisting may remove members not present in the payload. Always preview first.",
+      "Bulk import groups and members into the organization (self-host). HIGHLY destructive - overwriteExisting may remove members not present in the payload. Always preview first.",
     inputSchema: {
       type: "object",
       properties: {

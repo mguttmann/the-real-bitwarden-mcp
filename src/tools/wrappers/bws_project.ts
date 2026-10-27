@@ -127,7 +127,7 @@ export function makeProjectDeleteTool(sdk: SmSdkClient | undefined): ToolDef {
   return {
     name: "bws_project_delete",
     description:
-      "Delete a Secrets Manager project. HIGHLY destructive — secrets in the project are also deleted.",
+      "Delete a Secrets Manager project. HIGHLY destructive - secrets in the project are also deleted.",
     inputSchema: {
       type: "object",
       properties: { id: { type: "string" } },

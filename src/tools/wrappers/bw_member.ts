@@ -24,8 +24,8 @@ type Member = {
 /**
  * Default response is slim because Bitwarden public API embeds the full
  * permission graph in each list item, which inflates the response by a
- * factor of 5–10x and overruns LLM tool-call token budgets at modest
- * org sizes (~200 members, ~60 collections).
+ * large factor and overruns LLM tool-call token budgets even for
+ * organizations of modest size.
  *
  * Note: `accessSecretsManager` is intentionally NOT in this list. Bitwarden's
  * Public API neither returns it in GET responses nor applies it on POST/PUT
@@ -290,7 +290,7 @@ export function makeMemberRemoveTool(client: BitwardenHttpClient): ToolDef {
   return {
     name: "bw_member_remove",
     description:
-      "Remove a member from the organization (self-host). Highly destructive — the member loses access immediately.",
+      "Remove a member from the organization (self-host). Highly destructive - the member loses access immediately.",
     inputSchema: {
       type: "object",
       properties: { id: { type: "string" } },

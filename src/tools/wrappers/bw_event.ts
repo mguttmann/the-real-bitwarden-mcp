@@ -95,7 +95,7 @@ export function makeEventQueryTool(
         // Compose notes: wide-window warning takes precedence; oversize note is appended if also triggered
         let note: string | undefined;
         if (wideWindow) {
-          note = "Querying a > 24h window — response size may be large.";
+          note = "Querying a > 24h window - response size may be large.";
           if (oversize.note) note += " " + oversize.note;
         } else if (oversize.note) {
           note = oversize.note;

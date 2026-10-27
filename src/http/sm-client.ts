@@ -1,5 +1,5 @@
 /**
- * SmHttpClient — thin re-export of BitwardenHttpClient.
+ * SmHttpClient - thin re-export of BitwardenHttpClient.
  *
  * Secrets Manager requests are authenticated via OAuth client_credentials
  * with scope "api.secrets". The OAuthTokenCache is configured in

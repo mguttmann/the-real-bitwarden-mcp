@@ -54,7 +54,7 @@ async function previewResult(tool: ToolDef, input: Record<string, unknown>): Pro
       {
         type: "text",
         text:
-          `PREVIEW — would execute ${tool.name}\n` +
+          `PREVIEW - would execute ${tool.name}\n` +
           `Input: ${JSON.stringify(maskSecretValues(rest), null, 2)}\n` +
           planned +
           `To execute, retry the same call with confirm: "YES".`,

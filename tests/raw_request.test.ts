@@ -101,7 +101,7 @@ describe("bw_raw_request", () => {
       body: { email: "x@y.z" },
     });
     expect(sh.request).not.toHaveBeenCalled();
-    expect(textOf(res)).toMatch(/PREVIEW/);
+    expect(textOf(res)).toMatch(/^PREVIEW - would execute bw_raw_request\n/);
   });
 
   it("executes POST when confirm=YES", async () => {

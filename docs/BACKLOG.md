@@ -22,13 +22,6 @@ change that fixes it.
 - [license-delta-lost-update] The `bw_license_*_update` tools are read-modify-write; calls in one process are serialized since 0.2.0, but separate server processes can still lose an update. Kept: the API has no conditional update (upstream).
 - [placeholder-annotations-flip] Stub and placeholder write tools are annotated read-only and have no `confirm` property; configuring Secrets Manager later changes their annotations and schema. Kept: changes the tool contract (placeholders are pinned with no properties).
 
-## Docs
-
-- [org-size-telemetry-in-docs] Source comments in `bw_member.ts`, `bw_group.ts` and `bw_collection.ts` still mention observed organization sizes.
-- Existing tool descriptions and source comments still contain long dashes; replace them when the file is touched (descriptions are part of `tools/list`).
-- [long-dashes-in-touched-files] Files touched by the 0.2.0 change (for example `src/tools/confirm.ts` preview text, `src/tools/raw_request.ts`, `src/tools/wrappers/_helpers.ts`, `bws_machine_account.ts`, `tests/wrappers/bw_member.test.ts`) still hold old long dashes, some in tool output and descriptions. Replace them in a later run; list the changed description and preview strings in CHANGELOG (output change, not a contract change).
-- [docs-fixed-numbers] README and CHANGELOG name fixed numbers no test holds: the stdio message limit ("10 MiB", an SDK default) and the CI Node versions (only in `ci.yml`). Refer to the SDK default and `ci.yml` instead, or add a test.
-
 ## Release and repository (owner actions)
 
 - [pvr-disabled-but-security-md-points-to-it, security-md-reporting-channel-disabled] Private vulnerability reporting is off; SECURITY.md describes the interim channel. Turn it on and update SECURITY.md (RELEASING.md, Repository settings).

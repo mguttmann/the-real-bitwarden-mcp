@@ -31,13 +31,13 @@ export function requireInt(input: Record<string, unknown>, key: string): number 
 }
 
 export function requireOrgId(orgId: string | undefined): string {
-  if (!orgId) throw new Error("orgId required — set BWS_ORG_ID in .env.");
+  if (!orgId) throw new Error("orgId required - set BWS_ORG_ID in .env.");
   return orgId;
 }
 
 /**
  * Pick only the specified keys from an object. Used to build slim list
- * projections without removing keys through extra logic — we simply omit
+ * projections without removing keys through extra logic - we simply omit
  * the nested fields that inflate response sizes.
  */
 export function pickFields<T extends Record<string, unknown>>(
@@ -54,23 +54,23 @@ export function pickFields<T extends Record<string, unknown>>(
 /**
  * After building a list response, check whether its JSON size exceeds the
  * configured limit. If it does, return a `note` string that warns the caller.
- * The response is returned as-is — we never truncate silently.
+ * The response is returned as-is - we never truncate silently.
  *
  * Caveats:
  *  - Returns a `{note: string}` object meant to be spread into the response.
  *    Do NOT call on payloads that already carry their own top-level `note`
- *    field (e.g. `bws_project_list` uses one for "no project assignments") —
+ *    field (e.g. `bws_project_list` uses one for "no project assignments") -
  *    the spread will silently overwrite it. Use a distinct field name in
  *    that case.
  *  - Size measurement is `JSON.stringify(payload).length`, which counts
  *    UTF-16 code units, not bytes. For payloads with multibyte characters
- *    (umlauts etc.) the real byte size is up to ~5–10% larger than reported.
- *    This is intentional — the field is a hint, not a hard limit.
+ *    (umlauts etc.) the real byte size is up to ~5-10% larger than reported.
+ *    This is intentional - the field is a hint, not a hard limit.
  *
  * @param payload         The list payload object (members/collections/groups array etc.)
  * @param limitBytes      Maximum allowed JSON length (approx-bytes from config).
  * @param explicitInclude True when the caller opted in to nested fields via
- *                        the `include` parameter — the warning text differs.
+ *                        the `include` parameter - the warning text differs.
  */
 export function maybeNoteOversize(
   payload: object,

@@ -104,7 +104,7 @@ describe("bw_member_list", () => {
     expect(compactBytes).toBeLessThan(40 * 1024);
 
     // Additionally verify that the slim response is at least 3× smaller than the full
-    // (collections[5] + groups[3] + extra fields inflate the full by ~4–5×).
+    // (collections[5] + groups[3] + extra fields inflate the full by ~4-5x).
     const fullCompact = JSON.stringify({
       members: allMembers,
       truncated: false,
@@ -164,7 +164,7 @@ describe("bw_member_list", () => {
     expect(data.note).toBeDefined();
     expect(typeof data.note).toBe("string");
     expect(data.note).toMatch(/KB/);
-    // Members are still present — we never truncate silently
+    // Members are still present - we never truncate silently
     expect(data.members).toHaveLength(10);
   });
 

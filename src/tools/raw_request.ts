@@ -80,7 +80,7 @@ export function makeRawRequestTool(deps: RawRequestDeps): ToolDef {
       // segment in `path` becomes a path component), so this is belt-and-braces
       // against future refactors that might switch to string concatenation
       // without re-parsing, and against header-injection attempts.
-      // Reject control characters / backslashes intentionally — see comment above.
+      // Reject control characters / backslashes intentionally - see comment above.
       // eslint-disable-next-line no-control-regex
       if (/[\x00-\x1f\x7f\\]/.test(path)) {
         return {
@@ -134,7 +134,7 @@ export function makeRawRequestTool(deps: RawRequestDeps): ToolDef {
           content: [
             {
               type: "text",
-              text: `PREVIEW — would execute bw_raw_request\nInput: ${JSON.stringify(preview, null, 2)}\nTo execute, retry the same call with confirm: "YES".`,
+              text: `PREVIEW - would execute bw_raw_request\nInput: ${JSON.stringify(preview, null, 2)}\nTo execute, retry the same call with confirm: "YES".`,
             },
           ],
         };

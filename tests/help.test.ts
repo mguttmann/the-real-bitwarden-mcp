@@ -32,5 +32,6 @@ describe("bw_help", () => {
     expect(text).toContain("License / subscription");
     expect(text).toContain("Secrets Manager");
     expect(text).toContain("Universal");
+    expect(text).toContain("- `bw_member_list` - list members");
   });
 });

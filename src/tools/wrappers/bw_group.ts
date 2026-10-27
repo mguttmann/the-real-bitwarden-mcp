@@ -17,8 +17,8 @@ type Group = { id: string; name: string; [k: string]: unknown };
 /**
  * Default response is slim because Bitwarden public API embeds the full
  * permission graph in each list item, which inflates the response by a
- * factor of 5–10x and overruns LLM tool-call token budgets at modest
- * org sizes (~200 members, ~60 collections).
+ * large factor and overruns LLM tool-call token budgets even for
+ * organizations of modest size.
  */
 const SLIM_GROUP_FIELDS = ["id", "name", "externalId"] as const;
 

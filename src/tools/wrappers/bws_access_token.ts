@@ -22,7 +22,7 @@ function unsupportedTool(name: string, description: string, schema: JSONSchema):
 export function makeAccessTokenListTool(_client?: unknown): ToolDef {
   return unsupportedTool(
     "bws_access_token_list",
-    "List metadata for the access tokens of a machine account. NOTE: Not supported via API — use the web vault.",
+    "List metadata for the access tokens of a machine account. NOTE: Not supported via API - use the web vault.",
     {
       type: "object",
       properties: { machineAccountId: { type: "string" } },
@@ -35,7 +35,7 @@ export function makeAccessTokenListTool(_client?: unknown): ToolDef {
 export function makeAccessTokenCreateTool(_client?: unknown): ToolDef {
   return unsupportedTool(
     "bws_access_token_create",
-    "Create a new access token for a machine account. NOTE: Not supported via API — use the web vault.",
+    "Create a new access token for a machine account. NOTE: Not supported via API - use the web vault.",
     {
       type: "object",
       properties: {
@@ -56,7 +56,7 @@ export function makeAccessTokenCreateTool(_client?: unknown): ToolDef {
 export function makeAccessTokenRevokeTool(_client?: unknown): ToolDef {
   return unsupportedTool(
     "bws_access_token_revoke",
-    "Revoke one or more access tokens of a machine account. NOTE: Not supported via API — use the web vault.",
+    "Revoke one or more access tokens of a machine account. NOTE: Not supported via API - use the web vault.",
     {
       type: "object",
       properties: {

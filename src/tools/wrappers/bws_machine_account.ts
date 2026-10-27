@@ -22,7 +22,7 @@ function unsupportedTool(name: string, description: string, schema: JSONSchema):
 export function makeMachineAccountListTool(_client?: unknown, _orgId?: string): ToolDef {
   return unsupportedTool(
     "bws_machine_account_list",
-    "List Secrets Manager machine accounts in the organization. NOTE: Not supported via API — use the web vault.",
+    "List Secrets Manager machine accounts in the organization. NOTE: Not supported via API - use the web vault.",
     {
       type: "object",
       properties: { organizationId: { type: "string" } },
@@ -34,7 +34,7 @@ export function makeMachineAccountListTool(_client?: unknown, _orgId?: string): 
 export function makeMachineAccountGetTool(_client?: unknown): ToolDef {
   return unsupportedTool(
     "bws_machine_account_get",
-    "Get a single machine account by id. NOTE: Not supported via API — use the web vault.",
+    "Get a single machine account by id. NOTE: Not supported via API - use the web vault.",
     {
       type: "object",
       properties: { id: { type: "string" } },
@@ -47,7 +47,7 @@ export function makeMachineAccountGetTool(_client?: unknown): ToolDef {
 export function makeMachineAccountCreateTool(_client?: unknown, _orgId?: string): ToolDef {
   return unsupportedTool(
     "bws_machine_account_create",
-    "Create a new machine account. NOTE: Not supported via API — use the web vault.",
+    "Create a new machine account. NOTE: Not supported via API - use the web vault.",
     {
       type: "object",
       properties: { name: { type: "string" }, organizationId: { type: "string" } },
@@ -60,7 +60,7 @@ export function makeMachineAccountCreateTool(_client?: unknown, _orgId?: string)
 export function makeMachineAccountUpdateTool(_client?: unknown): ToolDef {
   return unsupportedTool(
     "bws_machine_account_update",
-    "Rename a machine account. NOTE: Not supported via API — use the web vault.",
+    "Rename a machine account. NOTE: Not supported via API - use the web vault.",
     {
       type: "object",
       properties: { id: { type: "string" }, name: { type: "string" } },
@@ -73,7 +73,7 @@ export function makeMachineAccountUpdateTool(_client?: unknown): ToolDef {
 export function makeMachineAccountDeleteTool(_client?: unknown): ToolDef {
   return unsupportedTool(
     "bws_machine_account_delete",
-    "Delete a machine account. NOTE: Not supported via API — use the web vault.",
+    "Delete a machine account. NOTE: Not supported via API - use the web vault.",
     {
       type: "object",
       properties: { id: { type: "string" } },
@@ -86,7 +86,7 @@ export function makeMachineAccountDeleteTool(_client?: unknown): ToolDef {
 export function makeMachineAccountProjectsTool(_client?: unknown): ToolDef {
   return unsupportedTool(
     "bws_machine_account_projects",
-    "List the projects a machine account has access to. NOTE: Not supported via API — use the web vault.",
+    "List the projects a machine account has access to. NOTE: Not supported via API - use the web vault.",
     {
       type: "object",
       properties: { id: { type: "string" } },
@@ -99,7 +99,7 @@ export function makeMachineAccountProjectsTool(_client?: unknown): ToolDef {
 export function makeMachineAccountGrantProjectTool(_client?: unknown): ToolDef {
   return unsupportedTool(
     "bws_machine_account_grant_project",
-    "Grant a machine account access to a project. NOTE: Not supported via API — use the web vault.",
+    "Grant a machine account access to a project. NOTE: Not supported via API - use the web vault.",
     {
       type: "object",
       properties: {
@@ -117,7 +117,7 @@ export function makeMachineAccountGrantProjectTool(_client?: unknown): ToolDef {
 export function makeMachineAccountRevokeProjectTool(_client?: unknown): ToolDef {
   return unsupportedTool(
     "bws_machine_account_revoke_project",
-    "Revoke a machine account's access to a project. NOTE: Not supported via API — use the web vault.",
+    "Revoke a machine account's access to a project. NOTE: Not supported via API - use the web vault.",
     {
       type: "object",
       properties: { id: { type: "string" }, projectId: { type: "string" } },

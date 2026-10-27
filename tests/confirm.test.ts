@@ -43,7 +43,7 @@ describe("withConfirmGuard", () => {
     const guarded = withConfirmGuard(tool, true);
     const res = await guarded.handler({ foo: "bar" });
     expect(inner).not.toHaveBeenCalled();
-    expect(textOf(res)).toMatch(/PREVIEW/);
+    expect(textOf(res)).toMatch(/^PREVIEW - would execute /);
   });
 
   it("executes when confirm=YES", async () => {
