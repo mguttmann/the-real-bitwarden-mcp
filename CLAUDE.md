@@ -14,10 +14,12 @@ npm run format:check   # prettier; npm run format to fix
 npm test               # vitest, mocked HTTP only
 npm run test:contract  # tool contract and protocol versions
 bash scripts/container-smoke.sh   # build and probe in the gateway Node image (needs docker)
+bash scripts/package-smoke.sh     # after a build: npm pack, gateway-style install, probe
 ```
 
 CI (`.github/workflows/ci.yml`) runs the same on Node 22, 24 and 26, plus
-`npm audit --omit=dev` and gitleaks. Releases: `RELEASING.md`.
+`npm audit --omit=dev`, gitleaks and `package-smoke` (the packed tarball
+installed the gateway way on linux x86_64, SDK binary must load). Releases: `RELEASING.md`.
 
 ## Rules
 

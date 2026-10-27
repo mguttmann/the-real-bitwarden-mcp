@@ -75,7 +75,14 @@ DOCKER_HOST=unix:///path/to/docker.sock bash scripts/container-smoke.sh
 ```
 
 `DOCKER`, `DOCKER_RUN_ARGS`, `NODE_IMAGE` and `SMOKE_WORKDIR` are optional
-(see the script header). `node scripts/stdio-probe.mjs <repoDir>
+(see the script header).
+
+`bash scripts/package-smoke.sh` (after `npm ci && npm run build`) packs
+the tarball, installs it the way the gateway does (`npm ci --omit=dev
+--ignore-scripts`), probes it from `node_modules` and fails if the tool
+contract differs or the Secrets Manager SDK binary does not load. CI runs
+it on linux x86_64 (job `package-smoke`); on a platform without an SDK
+binary set `REQUIRE_SDK=0`. `node scripts/stdio-probe.mjs <repoDir>
 <protocolVersion> [envFile]` runs a single probe against a local build.
 
 ## Adding a new tool

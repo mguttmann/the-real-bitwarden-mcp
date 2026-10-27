@@ -117,7 +117,10 @@ test (`tests/live-smoke.test.ts`, `npm run test:live`, which sets
 `RUN_LIVE_TESTS=1`) calls a real Bitwarden instance, read-only; a check
 whose instance is not configured is reported as skipped.
 `scripts/container-smoke.sh` builds and probes `dist/index.js` in the
-gateway's Node image.
+gateway's Node image. `scripts/package-smoke.sh` (CI job `package-smoke`,
+linux x86_64) packs the tarball, installs it the gateway way
+(`npm ci --omit=dev --ignore-scripts`), probes it from `node_modules` and
+fails if the Secrets Manager SDK binary does not load.
 
 The full green-bar checklist is the CI job (`.github/workflows/ci.yml`):
 

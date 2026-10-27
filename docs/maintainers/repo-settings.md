@@ -22,6 +22,7 @@ Settings > Rules > Rulesets > New branch ruleset.
   date before merging**. Required checks (job names of
   `.github/workflows/ci.yml`, GitHub Actions as the source):
   - `build-test (22)`, `build-test (24)`, `build-test (26)`
+  - `package-smoke`
   - `audit`
   - `gitleaks`
 
@@ -51,6 +52,7 @@ gh api -X POST repos/{owner}/{repo}/rulesets --input - <<'EOF'
         "required_status_checks": [
           { "context": "build-test (22)" }, { "context": "build-test (24)" },
           { "context": "build-test (26)" },
+          { "context": "package-smoke" },
           { "context": "audit" },
           { "context": "gitleaks" }
         ] } }
