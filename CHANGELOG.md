@@ -226,6 +226,28 @@ out after <ms> ms`.
 - **Long upstream error texts are cut** to 2000 characters in tool
   errors, followed by `... [truncated, <n> chars]` (before: a proxy's HTML
   error page went into the tool error in full).
+- **`bw_member_invite` / `bw_member_update` no longer offer member type
+  3** (Manager, removed upstream; the API rejects it). The `type` enum is
+  now `[0, 1, 2, 4]` and both descriptions list Owner, Admin, User and
+  Custom. Property names and required lists are unchanged.
+- **`bw_license_subscription_get` describes what the endpoint returns**
+  (Password Manager seats, max autoscale seats and storage; Secrets
+  Manager seats, max autoscale seats, service accounts and max autoscale
+  service accounts). Before, it promised plan, billing period and seats
+  used.
+- **`bw_license_*_update` calls on one server run one after the other.**
+  Each call reads the current total and sends current + delta, so two
+  concurrent calls could read the same total and one delta was lost.
+  Separate server processes can still race (the API has no conditional
+  update). When the read-back differs from the requested total, the error
+  now says to check `bw_license_subscription_get` before adjusting again.
+- **List truncation and the oversize note.** When a list stops at
+  `PAGINATION_MAX_ITEMS` inside a page, `continuationToken` is now `null`
+  (before: on later pages it was the token of the current page, which
+  repeats items already returned). A stop at `PAGINATION_MAX_PAGES` still
+  returns the token of the next page. The oversize note no longer tells
+  callers to page with `continuationToken` (no list tool accepts one); it
+  suggests narrowing the query or the event window instead.
 
 ### Added
 

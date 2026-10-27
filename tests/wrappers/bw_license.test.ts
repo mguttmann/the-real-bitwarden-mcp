@@ -266,3 +266,33 @@ describe("bw_license_* update tools when the outcome is unknown", () => {
     expect(textOf(res)).not.toMatch(/bw_license_subscription_get/);
   });
 });
+
+describe("bw_license_* read-back, description and concurrency", () => {
+  it("a read-back that differs from the requested total tells the caller to check bw_license_subscription_get before adjusting again", async () => {
+    const { client } = subscriptionApi(baseSub, { applyPut: false });
+    const res = await makeLicenseSeatsUpdateTool(client).handler({ seatAdjustment: 5 });
+    expect(res.isError).toBe(true);
+    expect(textOf(res)).toMatch(/bw_license_subscription_get before adjusting again/);
+  });
+
+  it("subscription_get description names only the fields the endpoint returns", () => {
+    const d = makeLicenseSubscriptionGetTool(fakeApi({}).client).description;
+    expect(d).not.toMatch(/plan|billing period|used/i);
+    expect(d).toMatch(/seats/);
+    expect(d).toMatch(/service accounts/);
+  });
+
+  it("two concurrent updates on the same client both apply (no lost update)", async () => {
+    const { client } = subscriptionApi(baseSub);
+    const [a, b] = await Promise.all([
+      makeLicenseSeatsUpdateTool(client).handler({ seatAdjustment: 1 }),
+      makeLicenseSeatsUpdateTool(client).handler({ seatAdjustment: 2 }),
+    ]);
+    expect(a.isError).toBeFalsy();
+    expect(b.isError).toBeFalsy();
+    const final = JSON.parse(
+      textOf(await makeLicenseSubscriptionGetTool(client).handler({})),
+    ) as Sub;
+    expect(final.passwordManager.seats).toBe(13);
+  });
+});

@@ -50,7 +50,12 @@ export async function fetchAllPages<T>(
       items.push(item);
     }
 
-    if (truncated) break;
+    // A stop inside a page has no resume point: the token that fetched this
+    // page would repeat it, so none is returned.
+    if (truncated) {
+      continuationToken = undefined;
+      break;
+    }
     if (!body.continuationToken) break;
     if (pageCount >= opts.maxPages) {
       truncated = true;

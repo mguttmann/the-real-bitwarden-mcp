@@ -164,8 +164,8 @@ export function makeMemberInviteTool(client: BitwardenHttpClient): ToolDef {
         email: { type: "string", format: "email" },
         type: {
           type: "integer",
-          enum: [0, 1, 2, 3, 4],
-          description: "0 Owner, 1 Admin, 2 User, 3 Manager, 4 Custom.",
+          enum: [0, 1, 2, 4],
+          description: "0 Owner, 1 Admin, 2 User, 4 Custom.",
         },
         externalId: { type: ["string", "null"], default: null },
         collections: { type: "array", default: [], items: { type: "object" } },
@@ -260,7 +260,11 @@ export function makeMemberUpdateTool(client: BitwardenHttpClient): ToolDef {
       type: "object",
       properties: {
         id: { type: "string" },
-        type: { type: "integer", enum: [0, 1, 2, 3, 4] },
+        type: {
+          type: "integer",
+          enum: [0, 1, 2, 4],
+          description: "0 Owner, 1 Admin, 2 User, 4 Custom.",
+        },
         externalId: { type: ["string", "null"] },
         collections: { type: "array", items: { type: "object" } },
         groups: { type: "array", items: { type: "string" } },

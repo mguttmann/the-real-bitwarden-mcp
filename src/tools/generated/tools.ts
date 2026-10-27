@@ -78,9 +78,20 @@ export function buildGeneratedTools(
           const { pathVars, query, body, autoPaginate } = splitInput(op, input);
           const path = buildPath(op.path, pathVars);
           if (op.method === "GET" && isListEndpoint(op) && autoPaginate) {
-            const page = await fetchAllPages(
-              client.request.bind(client), "GET", path, query, limits,
-            );
+            // The path alone does not tell a paged list from a sub-resource GET
+            // (e.g. /members/{id}/group-ids returns a bare array), so a first
+            // body without a `data` array is returned as it is.
+            let first: { status: number; body: unknown } | undefined;
+            const request = async <T,>(...args: Parameters<typeof client.request>) => {
+              const res = await client.request<T>(...args);
+              first ??= res;
+              return res;
+            };
+            const page = await fetchAllPages(request, "GET", path, query, limits);
+            const firstData = (first?.body as { data?: unknown } | null | undefined)?.data;
+            if (first && !Array.isArray(firstData)) {
+              return jsonResult({ status: first.status, body: first.body ?? null });
+            }
             return jsonResult({ items: page.items, truncated: page.truncated, continuationToken: page.continuationToken ?? null });
           }
           const res = await client.request(op.method, path, {

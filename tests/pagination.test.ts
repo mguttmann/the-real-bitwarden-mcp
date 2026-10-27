@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { maybeNoteOversize } from "../src/tools/wrappers/_helpers.js";
 import { fetchAllPages } from "../src/http/pagination.js";
 
 describe("fetchAllPages", () => {
@@ -92,5 +93,47 @@ describe("fetchAllPages", () => {
       { start: "2026-01-01" },
       { maxItems: 100, maxPages: 10 },
     );
+  });
+
+  it("a maxItems truncation mid-page returns no continuationToken (it would re-fetch the page)", async () => {
+    const pages = [
+      { data: [{ id: 1 }, { id: 2 }], continuationToken: "t2" },
+      { data: [{ id: 3 }, { id: 4 }], continuationToken: "t3" },
+    ];
+    let i = 0;
+    const request = vi.fn(async () => ({ status: 200, headers: new Headers(), body: pages[i++] }));
+    const res = await fetchAllPages<{ id: number }>(
+      request as any,
+      "GET",
+      "/x",
+      {},
+      { maxItems: 3, maxPages: 10 },
+    );
+    expect(res.items.map((x) => x.id)).toEqual([1, 2, 3]);
+    expect(res.truncated).toBe(true);
+    expect(res.continuationToken).toBeUndefined();
+  });
+
+  it("a maxPages truncation returns the token of the next page", async () => {
+    const request = vi.fn(async () => ({
+      status: 200,
+      headers: new Headers(),
+      body: { data: [{ id: 1 }], continuationToken: "next" },
+    }));
+    const res = await fetchAllPages(
+      request as any,
+      "GET",
+      "/x",
+      {},
+      { maxItems: 100, maxPages: 2 },
+    );
+    expect(res.truncated).toBe(true);
+    expect(res.continuationToken).toBe("next");
+  });
+
+  it("the oversize note does not tell callers to page with continuationToken", () => {
+    const note = maybeNoteOversize({ items: ["x".repeat(100)] }, 10, false).note;
+    expect(note).toBeDefined();
+    expect(note).not.toMatch(/continuationToken/);
   });
 });

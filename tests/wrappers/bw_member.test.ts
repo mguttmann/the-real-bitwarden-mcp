@@ -413,3 +413,16 @@ describe("bw_member_update keeps state for omitted fields", () => {
     }
   });
 });
+
+describe("bw_member type enum", () => {
+  it("invite and update do not offer the removed member type 3", () => {
+    for (const tool of [
+      makeMemberInviteTool(stubClient(() => ({})) as any),
+      makeMemberUpdateTool(stubClient(() => ({})) as any),
+    ]) {
+      const type = (tool.inputSchema.properties as Record<string, { enum: number[] }>).type!;
+      expect(type.enum).toEqual([0, 1, 2, 4]);
+      expect(JSON.stringify(tool.inputSchema)).not.toMatch(/3 Manager/);
+    }
+  });
+});

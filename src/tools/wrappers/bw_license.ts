@@ -9,7 +9,9 @@ export function makeLicenseSubscriptionGetTool(client: BitwardenHttpClient): Too
   return {
     name: "bw_license_subscription_get",
     description:
-      "Get the cloud organization's subscription details (plan, billing period, seats used vs purchased, storage). Cloud-only.",
+      "Get the cloud organization's subscription totals: Password Manager seats, max autoscale " +
+      "seats and storage (GB); Secrets Manager seats, max autoscale seats, service accounts and " +
+      "max autoscale service accounts. Cloud-only.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
     annotations: readOnly,
     handler: async () => {
@@ -79,6 +81,23 @@ async function planLicenseUpdate(
   };
 }
 
+/**
+ * The update is read-modify-write and the API has no conditional update, so
+ * concurrent calls on one client run one after the other; otherwise two
+ * deltas read the same total and one of them is lost. Separate processes
+ * can still race.
+ */
+const updateQueues = new WeakMap<BitwardenHttpClient, Promise<unknown>>();
+
+function serialized<T>(client: BitwardenHttpClient, fn: () => Promise<T>): Promise<T> {
+  const run = (updateQueues.get(client) ?? Promise.resolve()).then(fn, fn);
+  updateQueues.set(
+    client,
+    run.catch(() => undefined),
+  );
+  return run;
+}
+
 function makeLicenseUpdateTool(
   client: BitwardenHttpClient,
   f: LicenseField,
@@ -96,58 +115,61 @@ function makeLicenseUpdateTool(
     },
     annotations: destructive,
     plan: (input) => planLicenseUpdate(client, f, input),
-    handler: async (input) => {
-      try {
-        const plan = await planLicenseUpdate(client, f, input);
-        let res;
+    handler: (input) =>
+      serialized(client, async () => {
         try {
-          res = await client.request(plan.method, plan.path, { body: plan.body });
-        } catch (err) {
-          if (!isOutcomeUnknown(err)) throw err;
-          return errorText(
-            `${errorMessage(err)}\nThe ${f.label} update (${plan.before} -> ${plan.target}) may ` +
-              "already be applied. This tool takes a delta: check the current total with " +
-              "bw_license_subscription_get before retrying, or the delta may be applied twice.",
-          );
-        }
-        // The endpoint answers 200 even when it applies nothing, so read the total back.
-        let after: unknown;
-        try {
-          after = await readTotal(client, f);
-        } catch (err) {
-          // No automatic retry: the PUT was accepted, repeating the delta would apply it twice.
-          return errorText(
-            `The PUT ${plan.path} (${f.label}: ${plan.before} -> ${plan.target}) was answered ` +
-              `successfully, but the read-back of the new total failed: ${errorMessage(err)}\n` +
-              "The change has probably been applied. Check with bw_license_subscription_get " +
-              "before retrying; do not repeat the update blindly (it takes a delta).",
-          );
-        }
-        const result = {
-          field: `${f.product}.${f.field}`,
-          before: plan.before,
-          requested: plan.target,
-          after,
-          response: res.body ?? null,
-        };
-        if (after !== plan.target) {
-          return {
-            content: [
-              {
-                type: "text",
-                text:
-                  `${f.label} unchanged or different from the requested total after the update: ` +
-                  JSON.stringify(result, null, 2),
-              },
-            ],
-            isError: true,
+          const plan = await planLicenseUpdate(client, f, input);
+          let res;
+          try {
+            res = await client.request(plan.method, plan.path, { body: plan.body });
+          } catch (err) {
+            if (!isOutcomeUnknown(err)) throw err;
+            return errorText(
+              `${errorMessage(err)}\nThe ${f.label} update (${plan.before} -> ${plan.target}) may ` +
+                "already be applied. This tool takes a delta: check the current total with " +
+                "bw_license_subscription_get before retrying, or the delta may be applied twice.",
+            );
+          }
+          // The endpoint answers 200 even when it applies nothing, so read the total back.
+          let after: unknown;
+          try {
+            after = await readTotal(client, f);
+          } catch (err) {
+            // No automatic retry: the PUT was accepted, repeating the delta would apply it twice.
+            return errorText(
+              `The PUT ${plan.path} (${f.label}: ${plan.before} -> ${plan.target}) was answered ` +
+                `successfully, but the read-back of the new total failed: ${errorMessage(err)}\n` +
+                "The change has probably been applied. Check with bw_license_subscription_get " +
+                "before retrying; do not repeat the update blindly (it takes a delta).",
+            );
+          }
+          const result = {
+            field: `${f.product}.${f.field}`,
+            before: plan.before,
+            requested: plan.target,
+            after,
+            response: res.body ?? null,
           };
+          if (after !== plan.target) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text:
+                    `${f.label} unchanged or different from the requested total after the update. ` +
+                    "Check the current total with bw_license_subscription_get before adjusting " +
+                    "again (the tool takes a delta): " +
+                    JSON.stringify(result, null, 2),
+                },
+              ],
+              isError: true,
+            };
+          }
+          return jsonResult(result);
+        } catch (err) {
+          return asToolError(err);
         }
-        return jsonResult(result);
-      } catch (err) {
-        return asToolError(err);
-      }
-    },
+      }),
   };
 }
 

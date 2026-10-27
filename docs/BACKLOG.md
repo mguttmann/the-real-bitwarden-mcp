@@ -15,15 +15,12 @@ change that fixes it.
 
 ## Tools and schemas
 
-- [license-readback-mismatch-hint] When the license read-back succeeds but differs from the requested total, the error does not tell the caller to check `bw_license_subscription_get` before adjusting again.
-- [member-schema-drift] Minor: the harmful part (wiping state on update) is fixed in 0.2.0; what remains is a feature gap. `bw_member_invite` / `bw_member_update` still accept the legacy member type 3 (removed upstream), do not expose `permissions` for Custom members on invite, and do not expose the newer `email` / `name` update fields; changing the schema needs a contract fixture update.
-- [import-policy-missing-fields] `bw_org_import` lacks `inviteUsersAfterProvisioning` and requires email on deleted members; `bw_policy_set` lacks metadata.
-- [pagination-not-resumable, pagination-token-not-resumable] List tools return a `continuationToken` that no tool accepts, and the oversize note suggests paging with it; truncation at `PAGINATION_MAX_ITEMS` drops the token.
-- [no-input-size-limits] Tool inputs are not validated against the schema or bounded (array lengths, string lengths).
-- [license-get-description-overclaims] `bw_license_subscription_get` description promises plan, billing period and seats used, which the endpoint does not return.
-- [license-delta-lost-update] The `bw_license_*_update` tools read the current total and send current + delta (read-modify-write); two concurrent updates can lose one of them.
-- [placeholder-annotations-flip] Stub and placeholder write tools are annotated read-only and have no `confirm` property; configuring Secrets Manager later changes their annotations and schema.
-- [generated-tools-empty-and-latent-bugs] The raw-tool generator misclassifies sub-resource GETs as paged lists; not reachable while the shipped spec is empty.
+- [member-schema-drift] `bw_member_invite` does not expose `permissions` for Custom members and `bw_member_update` does not expose the newer `email` / `name` fields (type 3 was removed from the enum in 0.2.0). Kept: changes the tool contract.
+- [import-policy-missing-fields] `bw_org_import` lacks `inviteUsersAfterProvisioning` and requires email on deleted members; `bw_policy_set` lacks metadata. Kept: changes the tool contract.
+- [pagination-not-resumable, pagination-token-not-resumable] List tools return a `continuationToken` (after a `PAGINATION_MAX_PAGES` stop) that no list tool accepts; only `bw_raw_request` can pass it on. Kept: changes the tool contract (a new `continuationToken` input).
+- [no-input-size-limits] Tool inputs are not validated against the schema or bounded (array lengths, string lengths). Kept: validation and bounds reject calls that work today and need chosen limits (owner decision).
+- [license-delta-lost-update] The `bw_license_*_update` tools are read-modify-write; calls in one process are serialized since 0.2.0, but separate server processes can still lose an update. Kept: the API has no conditional update (upstream).
+- [placeholder-annotations-flip] Stub and placeholder write tools are annotated read-only and have no `confirm` property; configuring Secrets Manager later changes their annotations and schema. Kept: changes the tool contract (placeholders are pinned with no properties).
 
 ## Safety model
 

@@ -71,4 +71,19 @@ describe("buildGeneratedTools", () => {
     });
     expect(tools[0]!.annotations.destructiveHint).toBe(true);
   });
+
+  it("a GET sub-resource without a paged body returns the body, not an empty item list", async () => {
+    const op: OperationDef = {
+      ...memberList,
+      operationId: "members_group_ids",
+      toolName: "bw_member_group_ids_raw",
+      path: "/public/members/{id}/group-ids",
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+    };
+    const c = client(() => ({ status: 200, headers: new Headers(), body: ["g1", "g2"] }));
+    const tools = buildGeneratedTools(c as any, [op], { maxItems: 10, maxPages: 5 });
+    const res = await tools[0]!.handler({ id: "abc" });
+    expect(JSON.parse(textOf(res))).toEqual({ status: 200, body: ["g1", "g2"] });
+    expect(c.request).toHaveBeenCalledTimes(1);
+  });
 });

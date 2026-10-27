@@ -82,6 +82,6 @@ export function maybeNoteOversize(
   const kb = Math.round(size / 1024);
   const hint = explicitInclude
     ? `Response is ~${kb} KB because explicit include was requested. Consider narrowing the include set or using detail endpoints instead.`
-    : `Response is ~${kb} KB, which may exceed the LLM client's per-tool token budget. The current call used the slim default projection. If you encounter context issues, narrow the query (e.g. email_contains / name_contains) or page using continuationToken.`;
+    : `Response is ~${kb} KB, which may exceed the LLM client's per-tool token budget. The current call used the slim default projection. If you encounter context issues, narrow the query (e.g. email_contains / name_contains, or a shorter start/end window for events).`;
   return { note: hint };
 }
