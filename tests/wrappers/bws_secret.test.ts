@@ -85,6 +85,40 @@ describe("bws_secret_* (SDK-backed)", () => {
     expect(sdk.secretCreate).toHaveBeenCalledWith("org-1", "K", "V", "", ["p1"]);
   });
 
+  // Audit case preview-echoes-secret-value: cleartext only via bws_secret_get_value.
+  it("create and update return metadata without the decrypted value", async () => {
+    const secret = {
+      id: "s2",
+      key: "DB_PASS",
+      value: "FAKE-SECRET-1",
+      note: "n",
+      organizationId: "org-1",
+      projectId: "p1",
+      creationDate: "2026-01-01T00:00:00Z",
+      revisionDate: "2026-01-02T00:00:00Z",
+    };
+    const sdk = stubSdk({
+      secretCreate: vi.fn(async () => secret),
+      secretUpdate: vi.fn(async () => secret),
+    });
+    const created = await makeSecretCreateTool(sdk, "org-1").handler({
+      key: "DB_PASS",
+      value: "FAKE-SECRET-1",
+    });
+    const updated = await makeSecretUpdateTool(sdk).handler({
+      id: "s2",
+      key: "DB_PASS",
+      value: "FAKE-SECRET-1",
+      organizationId: "org-1",
+    });
+    const { value: _v, ...metadata } = secret;
+    for (const res of [created, updated]) {
+      expect(res.isError).toBeUndefined();
+      expect(textOf(res)).not.toContain("FAKE-SECRET-1");
+      expect(JSON.parse(textOf(res))).toEqual(metadata);
+    }
+  });
+
   it("create returns isError when sdk is undefined", async () => {
     const res = await makeSecretCreateTool(undefined, "org-1").handler({ key: "K", value: "V" });
     expect(res.isError).toBe(true);

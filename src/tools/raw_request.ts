@@ -1,5 +1,8 @@
 import type { ToolDef, ToolResult, Instance } from "../types.js";
 import type { BitwardenHttpClient, HttpMethod } from "../http/bitwarden-http-client.js";
+import { assertSafePath } from "../http/path-safety.js";
+import { maskSecretValues, scrubClientText } from "../redact.js";
+import { asToolError } from "./_error.js";
 
 const VALID: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 const INSTANCES: Instance[] = ["selfhost", "cloud", "sm"];
@@ -59,7 +62,12 @@ export function makeRawRequestTool(deps: RawRequestDeps): ToolDef {
       if (typeof path !== "string" || !path.startsWith("/")) {
         return {
           content: [
-            { type: "text", text: `Path must start with "/", got: ${JSON.stringify(input.path)}.` },
+            {
+              type: "text",
+              text: scrubClientText(
+                `Path must start with "/", got: ${JSON.stringify(input.path)}.`,
+              ),
+            },
           ],
           isError: true,
         };
@@ -78,6 +86,13 @@ export function makeRawRequestTool(deps: RawRequestDeps): ToolDef {
           ],
           isError: true,
         };
+      }
+      // Dot segments and encoded separators would leave the API base prefix
+      // after URL normalisation (the host stays locked either way).
+      try {
+        assertSafePath(path);
+      } catch (err) {
+        return asToolError(err);
       }
       if (!INSTANCES.includes(instance)) {
         return {
@@ -109,7 +124,8 @@ export function makeRawRequestTool(deps: RawRequestDeps): ToolDef {
 
       const isWrite = method !== "GET";
       if (isWrite && deps.confirmWrites && input.confirm !== "YES") {
-        const { confirm: _drop, ...preview } = input;
+        const { confirm: _drop, ...rest } = input;
+        const preview = maskSecretValues(rest);
         return {
           content: [
             {

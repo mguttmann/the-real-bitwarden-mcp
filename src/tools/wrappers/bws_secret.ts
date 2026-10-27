@@ -3,6 +3,12 @@ import type { SmSdkClient } from "../../http/sm-sdk-client.js";
 import { asToolError, jsonResult } from "../_error.js";
 import { readOnly, destructive, requireString, requireOrgId } from "./_helpers.js";
 
+/** Secret without its decrypted value: cleartext is only returned by bws_secret_get_value. */
+function secretMetadata(secret: { value?: unknown }): Record<string, unknown> {
+  const { value: _value, ...metadata } = secret;
+  return metadata;
+}
+
 const SDK_UNAVAILABLE_MSG =
   "Secrets Manager SDK not available on this platform. See README → Platform support.";
 
@@ -66,7 +72,8 @@ export function makeSecretCreateTool(
 ): ToolDef {
   return {
     name: "bws_secret_create",
-    description: "Create a new Secrets Manager secret. Destructive.",
+    description:
+      "Create a new Secrets Manager secret. Destructive. Returns the secret metadata without the value.",
     inputSchema: {
       type: "object",
       properties: {
@@ -91,7 +98,7 @@ export function makeSecretCreateTool(
           typeof input.note === "string" ? input.note : "",
           (input.projectIds as string[] | undefined) ?? [],
         );
-        return jsonResult(secret);
+        return jsonResult(secretMetadata(secret));
       } catch (err) {
         return asToolError(err);
       }
@@ -102,7 +109,8 @@ export function makeSecretCreateTool(
 export function makeSecretUpdateTool(sdk: SmSdkClient | undefined): ToolDef {
   return {
     name: "bws_secret_update",
-    description: "Update a Secrets Manager secret (key/value/note/projects). Destructive.",
+    description:
+      "Update a Secrets Manager secret (key/value/note/projects). Destructive. Returns the secret metadata without the value.",
     inputSchema: {
       type: "object",
       properties: {
@@ -131,7 +139,7 @@ export function makeSecretUpdateTool(sdk: SmSdkClient | undefined): ToolDef {
           typeof input.note === "string" ? input.note : "",
           (input.projectIds as string[] | undefined) ?? [],
         );
-        return jsonResult(secret);
+        return jsonResult(secretMetadata(secret));
       } catch (err) {
         return asToolError(err);
       }

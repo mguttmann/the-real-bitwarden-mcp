@@ -6,6 +6,7 @@ import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server
 import type { Logger } from "pino";
 import { loadConfig, type Config } from "./config.js";
 import { createLogger } from "./logger.js";
+import { scrubClientText } from "./redact.js";
 import { BitwardenHttpClient } from "./http/bitwarden-http-client.js";
 import { OAuthTokenCache } from "./http/oauth-token-cache.js";
 import { SmHttpClient } from "./http/sm-client.js";
@@ -112,6 +113,7 @@ export async function buildClients(
           clientSecret: config.selfhost.clientSecret,
           scope: "api.organization",
           fetch: fetchImpl,
+          timeoutMs: config.httpTimeoutMs,
         }),
         fetch: fetchImpl,
         timeoutMs: config.httpTimeoutMs,
@@ -126,6 +128,7 @@ export async function buildClients(
           clientSecret: config.cloud.clientSecret,
           scope: "api.organization",
           fetch: fetchImpl,
+          timeoutMs: config.httpTimeoutMs,
         }),
         fetch: fetchImpl,
         timeoutMs: config.httpTimeoutMs,
@@ -140,6 +143,7 @@ export async function buildClients(
           clientSecret: config.sm.parsedToken.clientSecret,
           scope: "api.secrets",
           fetch: fetchImpl,
+          timeoutMs: config.httpTimeoutMs,
         }),
         fetch: fetchImpl,
         timeoutMs: config.httpTimeoutMs,
@@ -317,17 +321,24 @@ export function startStdio(
   });
 }
 
+/**
+ * Log why the Secrets Manager SDK is unavailable. Goes through the logger so
+ * the scrubber applies; the message keeps its first line only (a Node
+ * "Require stack" lists absolute paths).
+ */
+export function reportSmSdkError(logger: Logger, error: SmSdkLoadError): void {
+  logger.warn(
+    { smSdk: { kind: error.kind, message: scrubClientText(error.message) } },
+    "sm-sdk: failed to load; bws_project_* and bws_secret_* will return 'SDK not available' until resolved. See README, Platform support.",
+  );
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config.logLevel);
   const clients = await buildClients(config);
 
-  if (clients.smSdkError) {
-    process.stderr.write(
-      `sm-sdk: failed to load — ${clients.smSdkError.kind}: ${clients.smSdkError.message}. ` +
-        `bws_project_* and bws_secret_* will return 'SDK not available' until resolved. See README → Platform support.\n`,
-    );
-  }
+  if (clients.smSdkError) reportSmSdkError(logger, clients.smSdkError);
 
   const registry = buildRegistry(config, clients);
   startStdio(registry, logger);
@@ -351,7 +362,9 @@ export function isEntryPoint(argv1: string | undefined, moduleUrl: string): bool
 
 if (isEntryPoint(process.argv[1], import.meta.url)) {
   main().catch((err) => {
-    process.stderr.write(`fatal: ${err instanceof Error ? err.message : err}\n`);
+    process.stderr.write(
+      `fatal: ${scrubClientText(err instanceof Error ? err.message : String(err))}\n`,
+    );
     process.exit(1);
   });
 }

@@ -1,5 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { OAuthTokenCache } from "../src/http/oauth-token-cache.js";
+import { buildClients } from "../src/index.js";
+import type { Config } from "../src/config.js";
+
+/** A fetch that never answers but rejects when its signal aborts, like undici. */
+function hangingFetch() {
+  return vi.fn(
+    (_url: string | URL | Request, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal!.reason));
+      }),
+  );
+}
 
 function makeFetch(responses: Response[]) {
   const queue = [...responses];
@@ -186,5 +198,78 @@ describe("OAuthTokenCache", () => {
     expect(captured).toBeDefined();
     expect(captured!.message).toBe("token endpoint returned a non-JSON 2xx response");
     expect(captured!.message).not.toContain("fake-secret-DDD444");
+  });
+
+  // Audit case token-fetch-no-timeout: HTTP_TIMEOUT_MS did not cover the token request.
+  it("aborts a token request that does not answer within timeoutMs", async () => {
+    const fetchImpl = hangingFetch();
+    const cache = new OAuthTokenCache({
+      tokenUrl: "https://id.example/connect/token",
+      clientId: "organization.x",
+      clientSecret: "FAKE-SECRET-1",
+      scope: "api.organization",
+      fetch: fetchImpl,
+      timeoutMs: 50,
+    });
+    const started = Date.now();
+    await expect(cache.getToken()).rejects.toThrow("OAuth token request timed out after 50 ms");
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(fetchImpl.mock.calls[0]![1]!.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("buildClients applies HTTP_TIMEOUT_MS to the token request of every instance", async () => {
+    const config: Config = {
+      selfhost: {
+        apiBase: "https://h.example/api",
+        identityUrl: "https://h.example/identity",
+        clientId: "organization.x",
+        clientSecret: "FAKE-SECRET-1",
+      },
+      cloud: {
+        apiBase: "https://c.example",
+        identityUrl: "https://c.example/identity",
+        clientId: "organization.y",
+        clientSecret: "FAKE-SECRET-2",
+      },
+      sm: undefined,
+      confirmWrites: false,
+      logLevel: "error",
+      httpTimeoutMs: 60,
+      paginationMaxItems: 100,
+      paginationMaxPages: 5,
+      maxListResponseBytes: 60000,
+    } as Config;
+    const clients = await buildClients(config, hangingFetch());
+    await expect(clients.selfhost!.request("GET", "/public/members")).rejects.toThrow(
+      "OAuth token request timed out after 60 ms",
+    );
+    await expect(clients.cloud!.request("GET", "/public/members")).rejects.toThrow(
+      "OAuth token request timed out after 60 ms",
+    );
+  });
+
+  // Audit case crlf-token-echo-in-tool-error: a token that cannot be sent as a
+  // header value made undici echo it in its error message.
+  it("rejects an access_token that is not a valid header value, without echoing it", async () => {
+    const cache = new OAuthTokenCache({
+      tokenUrl: "https://id.example/connect/token",
+      clientId: "organization.x",
+      clientSecret: "s",
+      scope: "api.organization",
+      fetch: makeFetch([
+        new Response(
+          JSON.stringify({ access_token: "FAKE-TOKEN-1\r\nX-Evil: 1", expires_in: 3600 }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          },
+        ),
+      ]),
+    });
+    const err = (await cache.getToken().catch((e: unknown) => e)) as Error;
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe(
+      "OAuth token response has an access_token that is not a valid header value",
+    );
   });
 });

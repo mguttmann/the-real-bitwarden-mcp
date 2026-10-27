@@ -53,10 +53,16 @@ in logs or tool error texts, and a reproducible, verifiable release chain.
 6. **One scrubbing mechanism** for secret material, used for logs and for
    every error text returned to the client. Confirm-gate previews mask secret
    values.
+   Outcome (stage C): `src/redact.ts` (pino formatter and err serializer,
+   `asToolError`, the `tools/call` catch path, `bw_raw_request`, SDK load
+   error); `bws_secret_create` / `bws_secret_update` return metadata only.
 7. **No redirects are followed** for token and API requests; a redirect is
-   an error.
+   an error. Outcome (stage C): `redirect: "manual"` on both fetch calls, 3xx
+   throws; the token request also honours `HTTP_TIMEOUT_MS`.
 8. **Paths**: dot segments (also percent-encoded) and backslashes are
    rejected in `bw_raw_request` paths and in ids interpolated into paths.
+   Outcome (stage C): one helper, `src/http/path-safety.ts`
+   (`assertSafePath` for raw paths, `pathId` for ids).
 9. **Release chain like action1-mcp**: tag-triggered workflow, CI gate, npm
    publish with provenance, SBOM, `SHA256SUMS`, GitHub attestations.
 10. **No new required environment variables.**

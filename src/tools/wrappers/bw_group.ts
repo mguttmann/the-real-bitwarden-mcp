@@ -1,6 +1,7 @@
 import type { PlannedRequest, ToolDef } from "../../types.js";
 import type { BitwardenHttpClient } from "../../http/bitwarden-http-client.js";
 import { fetchAllPages } from "../../http/pagination.js";
+import { pathId } from "../../http/path-safety.js";
 import { asToolError, jsonResult } from "../_error.js";
 import {
   readOnly,
@@ -121,7 +122,7 @@ export function makeGroupGetTool(client: BitwardenHttpClient): ToolDef {
     handler: async (input) => {
       try {
         const id = requireString(input, "id");
-        const res = await client.request("GET", `/public/groups/${encodeURIComponent(id)}`);
+        const res = await client.request("GET", `/public/groups/${pathId(id)}`);
         return jsonResult(res.body ?? null);
       } catch (err) {
         return asToolError(err);
@@ -176,7 +177,7 @@ async function planGroupUpdate(
   const id = requireString(input, "id");
   const name = requireString(input, "name");
   if (input.accessAll === true) throw new Error(ACCESS_ALL_REMOVED);
-  const path = `/public/groups/${encodeURIComponent(id)}`;
+  const path = `/public/groups/${pathId(id)}`;
   const notes: string[] = [];
   let externalId = input.externalId;
   if (!("externalId" in input)) {
@@ -237,7 +238,7 @@ export function makeGroupDeleteTool(client: BitwardenHttpClient): ToolDef {
     handler: async (input) => {
       try {
         const id = requireString(input, "id");
-        const res = await client.request("DELETE", `/public/groups/${encodeURIComponent(id)}`);
+        const res = await client.request("DELETE", `/public/groups/${pathId(id)}`);
         return jsonResult({ status: res.status, deleted: id });
       } catch (err) {
         return asToolError(err);
@@ -260,10 +261,7 @@ export function makeGroupGetMembersTool(client: BitwardenHttpClient): ToolDef {
     handler: async (input) => {
       try {
         const id = requireString(input, "id");
-        const res = await client.request(
-          "GET",
-          `/public/groups/${encodeURIComponent(id)}/member-ids`,
-        );
+        const res = await client.request("GET", `/public/groups/${pathId(id)}/member-ids`);
         return jsonResult(res.body ?? []);
       } catch (err) {
         return asToolError(err);
@@ -290,11 +288,9 @@ export function makeGroupSetMembersTool(client: BitwardenHttpClient): ToolDef {
       try {
         const id = requireString(input, "id");
         const memberIds = input.memberIds as string[];
-        const res = await client.request(
-          "PUT",
-          `/public/groups/${encodeURIComponent(id)}/member-ids`,
-          { body: { memberIds } },
-        );
+        const res = await client.request("PUT", `/public/groups/${pathId(id)}/member-ids`, {
+          body: { memberIds },
+        });
         return jsonResult({ status: res.status, id, memberIds });
       } catch (err) {
         return asToolError(err);

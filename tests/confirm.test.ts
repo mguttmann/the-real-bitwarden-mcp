@@ -61,4 +61,32 @@ describe("withConfirmGuard", () => {
     const props = (guarded.inputSchema as any).properties;
     expect(props.confirm.enum).toEqual(["YES"]);
   });
+
+  // Audit case preview-echoes-secret-value.
+  it("masks secret values in the preview input", async () => {
+    const tool = makeTool({ destructive: true, readOnly: false });
+    const guarded = withConfirmGuard(tool, true);
+    const res = await guarded.handler({ key: "DB_PASS", value: "FAKE-SECRET-1-abc", note: "n" });
+    const text = textOf(res);
+    expect(text).not.toContain("FAKE-SECRET-1-abc");
+    expect(text).toContain('"value": "<redacted, 17 chars>"');
+    // The secret name and other fields stay visible so the caller can check them.
+    expect(text).toContain('"key": "DB_PASS"');
+    expect(text).toContain('"note": "n"');
+  });
+
+  it("masks secret values in the planned request body", async () => {
+    const tool: ToolDef = {
+      ...makeTool({ destructive: true, readOnly: false }),
+      plan: async () => ({
+        method: "PUT",
+        path: "/x",
+        body: { nested: [{ password: "FAKE-SECRET-2" }], name: "kept" },
+      }),
+    };
+    const text = textOf(await withConfirmGuard(tool, true).handler({}));
+    expect(text).not.toContain("FAKE-SECRET-2");
+    expect(text).toContain('"password": "<redacted, 13 chars>"');
+    expect(text).toContain('"name": "kept"');
+  });
 });

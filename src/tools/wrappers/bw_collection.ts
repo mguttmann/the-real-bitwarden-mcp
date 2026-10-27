@@ -1,6 +1,7 @@
 import type { PlannedRequest, ToolDef } from "../../types.js";
 import type { BitwardenHttpClient } from "../../http/bitwarden-http-client.js";
 import { fetchAllPages } from "../../http/pagination.js";
+import { pathId } from "../../http/path-safety.js";
 import { asToolError, jsonResult } from "../_error.js";
 import {
   readOnly,
@@ -118,7 +119,7 @@ export function makeCollectionGetTool(client: BitwardenHttpClient): ToolDef {
     handler: async (input) => {
       try {
         const id = requireString(input, "id");
-        const res = await client.request("GET", `/public/collections/${encodeURIComponent(id)}`);
+        const res = await client.request("GET", `/public/collections/${pathId(id)}`);
         return jsonResult(res.body ?? null);
       } catch (err) {
         return asToolError(err);
@@ -143,7 +144,7 @@ async function planCollectionUpdate(
 ): Promise<PlannedRequest> {
   const id = requireString(input, "id");
   if (Array.isArray(input.users) && input.users.length > 0) throw new Error(USERS_NOT_SUPPORTED);
-  const path = `/public/collections/${encodeURIComponent(id)}`;
+  const path = `/public/collections/${pathId(id)}`;
   const notes: string[] = [];
   let externalId = input.externalId;
   if (!("externalId" in input)) {
@@ -209,7 +210,7 @@ export function makeCollectionDeleteTool(client: BitwardenHttpClient): ToolDef {
     handler: async (input) => {
       try {
         const id = requireString(input, "id");
-        const res = await client.request("DELETE", `/public/collections/${encodeURIComponent(id)}`);
+        const res = await client.request("DELETE", `/public/collections/${pathId(id)}`);
         return jsonResult({ status: res.status, deleted: id });
       } catch (err) {
         return asToolError(err);

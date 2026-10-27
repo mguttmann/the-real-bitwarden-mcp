@@ -30,7 +30,7 @@ BitwardenHttpClient       BitwardenHttpClient         SmHttpClient (REST)
 | --------- | --------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | Entry     | `src/index.ts`              | Bootstrap, build clients, build registry, attach stdio transport                                                |
 | Config    | `src/config.ts`             | Read `.env`, parse 3-part `BWS_ACCESS_TOKEN`, validate URLs/UUIDs                                               |
-| Logging   | `src/logger.ts`             | Pino with depth-expanded redaction of secrets across logs                                                       |
+| Logging   | `src/logger.ts`             | Pino; every log object goes through `src/redact.ts`                                                             |
 | HTTP      | `src/http/*`                | OAuth client_credentials, token cache, retries, pagination, host-locking                                        |
 | SM SDK    | `src/http/sm-sdk-client.ts` | Dynamic-loaded `@bitwarden/sdk-napi` wrapper, graceful fallback when binary missing                             |
 | Tools     | `src/tools/*`               | Tool registry, confirm-gate decorator, raw-request escape hatch, help index                                     |
@@ -69,17 +69,24 @@ Public API does not expose them with the required crypto layer.
 - **Slim list projections** — list tools strip nested fields by default
   and warn (not truncate) when the JSON exceeds
   `BW_MCP_MAX_LIST_RESPONSE_BYTES`. Use `include: ["all"]` to opt in.
-- **Host-locking** — the API base URL is parsed once in
-  `BitwardenHttpClient.buildUrl()`. Paths cannot reach outside the
-  configured host, even via `bw_raw_request`.
-- **Redaction** — `src/logger.ts` redacts 13 sensitive keys at four
-  nesting levels plus `err.stack`. OAuth error bodies are stripped
-  before being thrown so a failed token request can't echo back the
-  submitted `client_secret`.
+- **Host-locking** - `BitwardenHttpClient.buildUrl()` builds every URL
+  as API base plus path, so paths cannot reach another host, even via
+  `bw_raw_request`. `src/http/path-safety.ts` rejects dot segments and
+  encoded separators in raw paths and in ids, so paths also stay under
+  the API base prefix. Redirects are not followed (API and token
+  requests).
+- **Redaction** - `src/redact.ts` is the one scrubber for logs (pino
+  formatter and err serializer in `src/logger.ts`) and for error texts
+  returned to the client (`asToolError`, the `tools/call` catch path,
+  `bw_raw_request`). It removes the keys in `SENSITIVE_KEYS` at any
+  depth, scrubs secret-shaped substrings from messages and drops stacks.
+  Confirm-gate previews mask secret values. OAuth error bodies are
+  stripped before being thrown so a failed token request can't echo
+  back the submitted `client_secret`.
 
 ## Testing
 
-180 unit tests with mocked HTTP (`tests/`) cover routing, redaction,
+Unit tests with mocked HTTP (`tests/`) cover routing, redaction,
 confirm-gate, pagination, slim projections, error mapping, and the
 config parser. An opt-in live-smoke script (`scripts/live-smoke.ts`)
 hits a real Bitwarden instance when `RUN_LIVE_SMOKE=1`.

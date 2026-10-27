@@ -94,6 +94,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ignored and all events in the window were returned) now returns an error,
   and so does passing both `actingUserId` and `itemId` (the API silently
   applied only `actingUserId`).
+- **`bws_secret_create` / `bws_secret_update` no longer return the
+  decrypted value.** The result is the secret metadata (id, key, note,
+  organizationId, projectId, dates) without `value`, as the README already
+  stated; read the value with `bws_secret_get_value`.
+- **Confirm-gate previews mask secret values**: keys such as `value`,
+  `password`, `token` or `clientSecret` (the list in `src/redact.ts`,
+  except `key`, which is the secret name) in the input of any guarded tool,
+  in its planned request body and in `bw_raw_request` write bodies are
+  shown as `"<redacted, N chars>"`.
+- **Error texts returned to the client are scrubbed** with the same
+  mechanism as the logs: secret-shaped substrings (`Bearer ...`,
+  `client_secret=...`, JSON `"value": ...`, BWS tokens, ...) become
+  `[REDACTED]`, and stack frames or a Node `Require stack:` list are cut
+  off. This applies to `asToolError`, the `tools/call` catch path and
+  `bw_raw_request`.
+- **Logs**: sensitive keys are now removed at any depth and
+  case-insensitively (before: four levels, exact case), also inside
+  arrays, `BitwardenApiError.details`, cause chains and AggregateError
+  children; message scrubbing also covers JSON-shaped secrets and the
+  `value` / `secret` keys. Serialized errors carry `type`, `message`, own
+  properties, `cause` and `aggregateErrors`, never a stack.
+- **Secrets Manager SDK load errors** are logged through the logger as a
+  `warn` JSON line (`smSdk.kind`, scrubbed first line of the message)
+  instead of a raw stderr line with the full message and Require stack.
+  With `LOG_LEVEL=error` the line is no longer shown.
+- **Redirects are not followed.** API and OAuth token requests use
+  `redirect: "manual"`; a 3xx answer is an error (`BitwardenApiError`
+  code `redirect_not_followed`, or `OAuth token request failed: <status>
+(redirect not followed)`). Before, fetch followed redirects and a
+  307/308 re-sent the request body (for the token request: the
+  `client_secret`) to the new location.
+- **Dot segments and encoded separators are rejected.** `bw_raw_request`
+  returns an error for paths with `.` or `..` segments (also
+  percent-encoded, `%2e` in any case) or `%2F` / `%5C`; before they were
+  normalised and could leave the API base prefix (for example
+  `/../identity/...`). Ids put into wrapper paths (`bw_member_*`,
+  `bw_group_*`, `bw_collection_*`) are rejected when they are `.` / `..`
+  (also encoded) or contain `/`, `\`, `%2F` or `%5C`.
+- **`HTTP_TIMEOUT_MS` now also bounds the OAuth token request** (before it
+  had no timeout, so a token endpoint that accepted the connection but
+  never answered held every tool call of that instance until undici's
+  default header timeout). A timeout returns `OAuth token request timed
+out after <ms> ms`.
+- **An `access_token` that is not a valid header value** (anything but
+  visible ASCII) is rejected with a static error at token time, instead of
+  failing later with an undici error that quoted the token.
 
 ### Changed
 

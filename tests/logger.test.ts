@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Writable } from "node:stream";
 import { createLogger } from "../src/logger.js";
+import { mapErrorResponse } from "../src/http/errors.js";
 
 function captureStream(): { stream: Writable; chunks: string[] } {
   const chunks: string[] = [];
@@ -141,5 +142,101 @@ describe("createLogger", () => {
     expect(text).not.toContain("SERIALIZER_STACK_LEAK");
     // The serialized error object must not carry a `stack` field at all.
     expect(text).not.toContain('"stack"');
+  });
+});
+
+// Audit case main-logger-residual-gaps: each of these leaked through the
+// path-based redaction (arrays, depth beyond four, AggregateError children,
+// JSON-shaped messages).
+describe("createLogger residual gaps", () => {
+  it("redacts a secret inside an array of a BitwardenApiError's details", () => {
+    const { stream, chunks } = captureStream();
+    const logger = createLogger("info", stream);
+    const err = mapErrorResponse(400, {
+      Message: "The request is invalid.",
+      ValidationErrors: { Value: ["FAKE-SECRET-1"] },
+    });
+    logger.warn({ tool: "bw_raw_request", err }, "tool handler failed");
+    expect(chunks.join("")).not.toContain("FAKE-SECRET-1");
+  });
+
+  it("redacts sensitive keys at any nesting depth, also inside arrays", () => {
+    const { stream, chunks } = captureStream();
+    const logger = createLogger("info", stream);
+    logger.info({ a: { b: { c: { d: { e: { value: "FAKE-SECRET-2" } } } } } }, "deep");
+    logger.info({ list: [{ items: [{ password: "FAKE-SECRET-3" }] }] }, "array");
+    const text = chunks.join("");
+    expect(text).not.toContain("FAKE-SECRET-2");
+    expect(text).not.toContain("FAKE-SECRET-3");
+  });
+
+  it("matches sensitive keys case-insensitively", () => {
+    const { stream, chunks } = captureStream();
+    const logger = createLogger("info", stream);
+    logger.info({ data: { Value: "FAKE-SECRET-4", CLIENT_SECRET: "FAKE-SECRET-5" } }, "case");
+    const text = chunks.join("");
+    expect(text).not.toContain("FAKE-SECRET-4");
+    expect(text).not.toContain("FAKE-SECRET-5");
+  });
+
+  it("scrubs AggregateError children and drops their stacks", () => {
+    const { stream, chunks } = captureStream();
+    const logger = createLogger("info", stream);
+    const child = new Error("child failed: Bearer FAKE-TOKEN-6");
+    child.stack = "Error: child\n    at x (token=FAKE-STACK-7)";
+    const err = new AggregateError([child], "several requests failed");
+    logger.warn({ err }, "tool handler failed");
+    const text = chunks.join("");
+    expect(text).not.toContain("FAKE-TOKEN-6");
+    expect(text).not.toContain("FAKE-STACK-7");
+    expect(text).toContain("child failed: Bearer [REDACTED]");
+  });
+
+  it("scrubs a cause chain deeper than one level", () => {
+    const { stream, chunks } = captureStream();
+    const logger = createLogger("info", stream);
+    const root = new Error("token endpoint said client_secret=FAKE-SECRET-8");
+    const err = new Error("outer", { cause: new Error("middle", { cause: root }) });
+    logger.warn({ err }, "tool handler failed");
+    expect(chunks.join("")).not.toContain("FAKE-SECRET-8");
+  });
+
+  it("scrubs JSON-shaped secret values in messages", () => {
+    const { stream, chunks } = captureStream();
+    const logger = createLogger("info", stream);
+    const err = new Error('upstream echoed {"value":"FAKE SECRET 9","secret":"FAKE-SECRET-10"}');
+    logger.warn({ err }, "tool handler failed");
+    logger.warn('plain message {"value": "FAKE-SECRET-11"}');
+    const text = chunks.join("");
+    expect(text).not.toContain("FAKE SECRET 9");
+    expect(text).not.toContain("SECRET 9");
+    expect(text).not.toContain("FAKE-SECRET-10");
+    expect(text).not.toContain("FAKE-SECRET-11");
+  });
+
+  it("scrubs the message pino takes from err when no msg is given", () => {
+    const { stream, chunks } = captureStream();
+    const logger = createLogger("info", stream);
+    logger.warn({ err: new Error("failed with Bearer FAKE-TOKEN-12") });
+    expect(chunks.join("")).not.toContain("FAKE-TOKEN-12");
+  });
+
+  it("survives cyclic objects", () => {
+    const { stream, chunks } = captureStream();
+    const logger = createLogger("info", stream);
+    const obj: Record<string, unknown> = { name: "loop", token: "FAKE-TOKEN-13" };
+    obj.self = obj;
+    logger.info({ obj }, "cycle");
+    const text = chunks.join("");
+    expect(text).not.toContain("FAKE-TOKEN-13");
+    expect(text).toContain("loop");
+  });
+
+  it("keeps non-secret fields", () => {
+    const { stream, chunks } = captureStream();
+    const logger = createLogger("info", stream);
+    logger.info({ tool: "bw_member_list", count: 3 }, "ok");
+    const line = JSON.parse(chunks.join("").trim());
+    expect(line).toMatchObject({ tool: "bw_member_list", count: 3, msg: "ok" });
   });
 });

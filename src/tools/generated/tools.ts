@@ -1,6 +1,7 @@
 import type { JSONSchema, OperationDef, ParameterDef, ToolDef, ToolResult } from "../../types.js";
 import type { BitwardenHttpClient } from "../../http/bitwarden-http-client.js";
 import { fetchAllPages } from "../../http/pagination.js";
+import { pathId } from "../../http/path-safety.js";
 import { asToolError, jsonResult } from "../_error.js";
 
 export type BuilderLimits = { maxItems: number; maxPages: number };
@@ -38,7 +39,7 @@ function buildPath(path: string, params: Record<string, unknown>): string {
   return path.replace(/\{([^}]+)\}/g, (_, name: string) => {
     const v = params[name];
     if (v === undefined || v === null) throw new Error(`Missing path parameter "${name}" for ${path}`);
-    return encodeURIComponent(String(v));
+    return pathId(String(v));
   });
 }
 

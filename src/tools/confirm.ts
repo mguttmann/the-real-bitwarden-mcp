@@ -1,5 +1,6 @@
 import type { PlannedRequest, ToolDef, ToolResult } from "../types.js";
 import { asToolError } from "./_error.js";
+import { maskSecretValues } from "../redact.js";
 
 function shouldGuard(tool: ToolDef, enabled: boolean): boolean {
   if (!enabled) return false;
@@ -8,7 +9,8 @@ function shouldGuard(tool: ToolDef, enabled: boolean): boolean {
 
 function describePlan(plan: PlannedRequest): string {
   let text = `Request: ${plan.method} ${plan.path}\n`;
-  if (plan.body !== undefined) text += `Body: ${JSON.stringify(plan.body, null, 2)}\n`;
+  if (plan.body !== undefined)
+    text += `Body: ${JSON.stringify(maskSecretValues(plan.body), null, 2)}\n`;
   for (const note of plan.notes ?? []) text += `Note: ${note}\n`;
   return text;
 }
@@ -29,7 +31,7 @@ async function previewResult(tool: ToolDef, input: Record<string, unknown>): Pro
         type: "text",
         text:
           `PREVIEW — would execute ${tool.name}\n` +
-          `Input: ${JSON.stringify(rest, null, 2)}\n` +
+          `Input: ${JSON.stringify(maskSecretValues(rest), null, 2)}\n` +
           planned +
           `To execute, retry the same call with confirm: "YES".`,
       },

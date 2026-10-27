@@ -2,6 +2,7 @@ import { Server, type Tool } from "@modelcontextprotocol/server";
 import type { Logger } from "pino";
 import type { ToolRegistry } from "./tools/registry.js";
 import { SERVER_VERSION } from "./version.js";
+import { scrubClientText } from "./redact.js";
 
 export function createMcpServer(registry: ToolRegistry, logger: Logger): Server {
   const server = new Server(
@@ -30,7 +31,12 @@ export function createMcpServer(registry: ToolRegistry, logger: Logger): Server 
     } catch (err) {
       logger.warn({ tool: tool.name, err }, "tool handler failed");
       return {
-        content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
+        content: [
+          {
+            type: "text",
+            text: scrubClientText(err instanceof Error ? err.message : String(err)),
+          },
+        ],
         isError: true,
       };
     }

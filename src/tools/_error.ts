@@ -1,15 +1,19 @@
 import { BitwardenApiError } from "../http/errors.js";
 import type { ToolResult } from "../types.js";
+import { scrubClientText } from "../redact.js";
 
+// Error texts reach the MCP client (and any transcript): scrubbed of secrets, no stacks.
 export function asToolError(err: unknown): ToolResult {
   if (err instanceof BitwardenApiError) {
     return {
-      content: [{ type: "text", text: err.toString() }],
+      content: [{ type: "text", text: scrubClientText(err.toString()) }],
       isError: true,
     };
   }
   return {
-    content: [{ type: "text", text: err instanceof Error ? err.message : String(err) }],
+    content: [
+      { type: "text", text: scrubClientText(err instanceof Error ? err.message : String(err)) },
+    ],
     isError: true,
   };
 }

@@ -72,6 +72,15 @@ export class BitwardenHttpClient {
         tokenRefreshed = true;
         continue;
       }
+      if (res.status >= 300 && res.status < 400) {
+        // Redirects are not followed (a 307/308 would re-send the body to the
+        // new location); the Bitwarden APIs do not use them.
+        throw new BitwardenApiError(
+          res.status,
+          "redirect_not_followed",
+          `HTTP ${res.status} redirect not followed; check the configured API base URL`,
+        );
+      }
       const delay = this.computeRetryDelay(res.status, res.headers, attempt, idempotent);
       if (delay === null || attempt >= maxRetries) {
         const err = mapErrorResponse(res.status, res.body);
@@ -113,6 +122,7 @@ export class BitwardenHttpClient {
         },
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
         signal: controller.signal,
+        redirect: "manual",
       });
       const body = await this.parseBody<T>(res);
       return { status: res.status, headers: res.headers, body };

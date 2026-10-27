@@ -54,12 +54,26 @@ Out of scope:
 
 - `BITWARDEN_CONFIRM_WRITES=true` is the default — destructive tools
   return a preview unless explicitly confirmed.
-- Logs redact 13 sensitive keys at four nesting levels plus `err.stack`
-  (see `src/logger.ts`).
+- One scrubber (`src/redact.ts`) is used for logs and for every error
+  text returned to the MCP client: the keys listed in `SENSITIVE_KEYS`
+  are removed at any depth (case-insensitive, also in arrays, error
+  details, cause chains and AggregateError children), secret-shaped
+  substrings in messages (`Bearer ...`, `client_secret=...`, JSON
+  `"value": ...`, BWS tokens) are replaced, and stacks are dropped.
+- Confirm-gate previews mask secret values (`<redacted, N chars>`);
+  `bws_secret_create` / `bws_secret_update` return metadata without the
+  value.
 - OAuth error responses are stripped of their body before being thrown,
   so a failed token request can't echo back the submitted
   `client_secret`.
-- The API base URL is parsed and host-locked once at startup; tool
-  paths cannot reach outside the configured host.
+- Request URLs are built as API base plus path, so tool paths cannot
+  reach another host. Dot segments (`.`, `..`, also percent-encoded) and
+  encoded separators (`%2F`, `%5C`) are rejected in `bw_raw_request`
+  paths and in ids put into wrapper paths, so a path cannot leave the
+  API base prefix either (`src/http/path-safety.ts`).
 - `bw_raw_request` rejects control characters and backslashes in
   `path`.
+- Redirects are never followed, for API and OAuth token requests; a 3xx
+  answer is an error (a followed 307/308 would re-send the request body,
+  including the `client_secret`, to the new location).
+- `HTTP_TIMEOUT_MS` bounds API requests and the OAuth token request.

@@ -185,10 +185,43 @@ describe("bw_raw_request", () => {
     expect(sh.request).not.toHaveBeenCalled();
   });
 
-  it("allows /.. traversal — buildUrl normalises within configured host", async () => {
-    // ".." cannot escape the configured base URL: the host stays locked.
-    // This test pins that the tool forwards the request (the server may 404,
-    // but the request never reaches a different host).
+  // Audit cases raw-path-prefix-escape and raw-request-dot-segment-escape:
+  // dot segments (also percent-encoded) and encoded separators would let the
+  // path leave the API base prefix after URL normalisation.
+  const ESCAPING_PATHS = [
+    "/../../etc/passwd",
+    "/public/members/..",
+    "/public/./members",
+    "/%2e%2e/admin/users",
+    "/%2E%2E/admin",
+    "/.%2e/admin",
+    "/%2e./admin",
+    "/public/%2e/members",
+    "/public/members/%2E",
+    "/public%2f..%2fadmin",
+    "/public%2F..%2Fadmin",
+    "/public%5c..%5cadmin",
+    "/public/members/x%5Cy",
+  ];
+  for (const path of ESCAPING_PATHS) {
+    it(`rejects ${JSON.stringify(path)} without sending a request`, async () => {
+      const sh = stubClient();
+      const tool = makeRawRequestTool({
+        selfhost: sh as any,
+        cloud: undefined,
+        sm: undefined,
+        confirmWrites: true,
+      });
+      for (const method of ["GET", "DELETE"]) {
+        const res = await tool.handler({ method, path });
+        expect(res.isError).toBe(true);
+        expect(textOf(res)).toMatch(/dot segment|encoded separator/);
+      }
+      expect(sh.request).not.toHaveBeenCalled();
+    });
+  }
+
+  it("still allows dots inside a segment and in the query string", async () => {
     const sh = stubClient();
     const tool = makeRawRequestTool({
       selfhost: sh as any,
@@ -196,8 +229,32 @@ describe("bw_raw_request", () => {
       sm: undefined,
       confirmWrites: false,
     });
-    const res = await tool.handler({ method: "GET", path: "/../../etc/passwd" });
+    const res = await tool.handler({ method: "GET", path: "/public/a..b/.well-known?x=../y" });
     expect(res.isError).toBeUndefined();
-    expect(sh.request).toHaveBeenCalledWith("GET", "/../../etc/passwd", expect.anything());
+    expect(sh.request).toHaveBeenCalled();
+  });
+
+  // Audit case preview-echoes-secret-value (raw request bodies).
+  it("masks secret values in the write preview body", async () => {
+    const sh = stubClient();
+    const tool = makeRawRequestTool({
+      selfhost: undefined,
+      cloud: undefined,
+      sm: sh as any,
+      confirmWrites: true,
+    });
+    const res = await tool.handler({
+      instance: "sm",
+      method: "POST",
+      path: "/organizations/org-1/secrets",
+      body: { key: "DB_PASS", value: "FAKE-SECRET-1", clientSecret: "FAKE-SECRET-2" },
+    });
+    const text = textOf(res);
+    expect(text).toMatch(/PREVIEW/);
+    expect(text).not.toContain("FAKE-SECRET-1");
+    expect(text).not.toContain("FAKE-SECRET-2");
+    expect(text).toContain('"value": "<redacted, 13 chars>"');
+    expect(text).toContain('"key": "DB_PASS"');
+    expect(sh.request).not.toHaveBeenCalled();
   });
 });

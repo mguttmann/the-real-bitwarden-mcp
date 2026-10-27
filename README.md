@@ -172,7 +172,7 @@ configured**, otherwise the server refuses to start.
 | `BWS_ORG_ID`                       | SM project/secret create/list | Organization UUID                                                             |
 | `BITWARDEN_CONFIRM_WRITES`         |                               | `true` (default) returns previews for destructive tools                       |
 | `LOG_LEVEL`                        |                               | `debug` \| `info` \| `warn` (default) \| `error`                              |
-| `HTTP_TIMEOUT_MS`                  |                               | default 30000                                                                 |
+| `HTTP_TIMEOUT_MS`                  |                               | default 30000; applies to API and OAuth token requests                        |
 | `PAGINATION_MAX_ITEMS`             |                               | default 1000                                                                  |
 | `PAGINATION_MAX_PAGES`             |                               | default 20                                                                    |
 | `BW_MCP_MAX_LIST_RESPONSE_BYTES`   |                               | default 60000 — adds a `note` warning to list responses that exceed this size |
@@ -386,9 +386,15 @@ them always returns `isError: true` with a link to the web vault. Use
   preview unless invoked with `confirm: "YES"`.
 - The `bws_secret_list` tool returns secret identifiers only (no value field).
   Cleartext values are only returned through `bws_secret_get_value(id)`, one
-  secret at a time.
-- The logger redacts all bearer tokens, client secrets, access tokens, and
-  the `value` field. Tokens are never echoed back in tool responses.
+  secret at a time: `bws_secret_create` / `bws_secret_update` return the
+  metadata without the value, and confirm-gate previews show secret values
+  as `<redacted, N chars>`.
+- Logs and error texts returned to the client go through one scrubber
+  (`src/redact.ts`): the keys listed there (bearer tokens, client secrets,
+  access tokens, `value`, ...) are removed at any depth, and secret-shaped
+  substrings in messages are replaced with `[REDACTED]`.
+- Redirects are never followed; `bw_raw_request` paths and ids with dot
+  segments or encoded separators are rejected.
 - The `bw_raw_request` escape hatch defaults to `instance: "selfhost"` and
   rejects calls against instances that are not configured.
 - The `{ENCRYPTION_KEY}` portion of `BWS_ACCESS_TOKEN` is passed to the SDK
@@ -427,7 +433,7 @@ curl -sS "https://vault.example.com/api/organizations/{ORG_ID}/projects" \
 
 The `@bitwarden/sdk-napi` native binary is not available for the current
 platform. See the Platform support table above for the list of supported
-combinations. The MCP will log the load error to stderr at startup.
+combinations. The MCP logs the load error to stderr at startup (a `warn` log line).
 
 On unsupported platforms, all Public-API tools (`bw_*`) continue to work
 normally. Only the `bws_project_*` and `bws_secret_*` tools are affected.
