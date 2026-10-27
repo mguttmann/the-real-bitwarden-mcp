@@ -44,6 +44,10 @@ npm test              # unit tests with mocked HTTP
 npm run test:contract # tool contract and protocol versions (also part of npm test)
 ```
 
+`npm test` includes `tests/stdio-probe.test.ts`, which starts the server
+from `src/` over stdio. CI also runs it against the build:
+`npm run build && STDIO_PROBE_BUILT=1 npx vitest run tests/stdio-probe.test.ts`.
+
 Optional: `npm run test:coverage` (@vitest/coverage-v8 report; no
 threshold is enforced).
 

@@ -266,7 +266,14 @@ out after <ms> ms`.
   2025-11-25 and 2026-07-28 on the real stdio wiring.
 - `scripts/stdio-probe.mjs` and `scripts/container-smoke.sh`: build in
   the gateway image and probe `dist/index.js` over stdio without network
-  (see CONTRIBUTING).
+  (see CONTRIBUTING). The probe hands the server the caller's full
+  environment in every protocol mode.
+- `tests/stdio-probe.test.ts`: the real entry point over stdio for every
+  protocol revision (tool contract and `serverInfo.version`); CI runs it
+  again against the built `dist/index.js`.
+- Tests for the confirm gate over the whole registry, for upstream 4xx/5xx
+  in wrapper tools, for a second 401 after the token refresh and for a
+  throwing tool handler (client text and log line).
 - Release chain: `.github/workflows/release.yml` (tag `v*`: CI gate,
   clean build, npm tarball, CycloneDX SBOM, `SHA256SUMS`, build
   provenance attestation, GitHub release; npm publish with provenance
@@ -313,7 +320,9 @@ out after <ms> ms`.
 - `serverInfo.version` reports the package version (was `0.1.0`).
 - The OAuth token request honours `HTTP_TIMEOUT_MS`.
 - `tests/live-smoke.test.ts` passed the `buildClients` promise instead of
-  its result, so the opt-in live smoke registered no instance tools.
+  its result, so the opt-in live smoke registered no instance tools. A
+  check whose instance is not configured is now reported as skipped
+  instead of passing without a request.
 
 ### Security
 
@@ -321,7 +330,9 @@ out after <ms> ms`.
   returned to the client; it covers nested structures, error details,
   cause chains and free-text messages, and drops stack traces.
 - Confirm previews and `bw_raw_request` write bodies mask secret values;
-  secret create/update results no longer contain the value.
+  secret create/update results no longer contain the value, and
+  `bws_secret_list` drops a `value` field itself instead of relying on
+  the SDK leaving it out.
 - Requests never follow redirects, so credentials and request bodies are
   not re-sent to another location.
 - Paths and ids with dot segments or encoded separators are rejected, so

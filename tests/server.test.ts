@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
+import { Writable } from "node:stream";
 import { describe, it, expect } from "vitest";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { createMcpServer } from "../src/server.js";
 import { ToolRegistry } from "../src/tools/registry.js";
 import { createLogger } from "../src/logger.js";
 import type { ToolDef } from "../src/types.js";
+import { BitwardenApiError } from "../src/http/errors.js";
 
 const echoTool: ToolDef = {
   name: "bw_echo",
@@ -91,6 +93,51 @@ describe("createMcpServer", () => {
       name: "the-real-bitwarden-mcp",
       version: pkg.version,
     });
+
+    await client.close();
+    await server.close();
+  });
+
+  it("a throwing handler: scrubbed isError text to the client, one warn line without secrets", async () => {
+    const lines: string[] = [];
+    const stream = new Writable({
+      write(chunk, _enc, cb) {
+        lines.push(chunk.toString());
+        cb();
+      },
+    });
+    const registry = new ToolRegistry();
+    registry.register({
+      ...echoTool,
+      name: "bw_throws",
+      handler: async () => {
+        throw new BitwardenApiError(
+          502,
+          "upstream_error",
+          "proxy said: Authorization: Bearer FAKE-TOKEN-1",
+          { client_secret: "FAKE-SECRET-1", Message: "x" },
+        );
+      },
+    });
+    const server = createMcpServer(registry, createLogger("warn", stream));
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({ name: "test", version: "0" }, { capabilities: {} });
+    await client.connect(clientTransport);
+
+    const result = await client.callTool({ name: "bw_throws", arguments: { message: "m" } });
+    expect(result.isError).toBe(true);
+    const text = (result.content as { type: string; text: string }[])[0]!.text;
+    expect(text).toMatch(/^proxy said: /);
+    expect(text).not.toContain("FAKE-TOKEN-1");
+
+    expect(lines).toHaveLength(1);
+    const log = JSON.parse(lines[0]!) as { level: number; tool: string; msg: string };
+    expect(log.level).toBe(40);
+    expect(log.tool).toBe("bw_throws");
+    expect(log.msg).toBe("tool handler failed");
+    expect(lines[0]).not.toContain("FAKE-TOKEN-1");
+    expect(lines[0]).not.toContain("FAKE-SECRET-1");
 
     await client.close();
     await server.close();

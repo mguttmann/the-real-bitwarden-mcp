@@ -109,6 +109,9 @@ async function probeModern() {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: serverArgs,
+    // The SDK passes only a few default variables (HOME, PATH, ...); the
+    // legacy probe and the gateway hand the server the full environment.
+    env: process.env,
     stderr: "pipe",
   });
   let stderr = "";

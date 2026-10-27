@@ -3,7 +3,7 @@
 // argv[1] ends in index.js. With no instance configured, main() fails
 // with the config error and exit code 1; a skipped main() exits 0 silently.
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, symlinkSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,17 +23,21 @@ function cleanEnv(): NodeJS.ProcessEnv {
 describe("entry point", () => {
   it("runs main() when started through a bin symlink", () => {
     const dir = mkdtempSync(join(tmpdir(), "bwmcp-bin-"));
-    const link = join(dir, "bitwarden-mcp");
-    symlinkSync(entry, link);
-    // cwd is the empty temp dir so no .env is picked up.
-    const res = spawnSync(process.execPath, ["--import", tsxLoader, link], {
-      cwd: dir,
-      env: cleanEnv(),
-      input: "",
-      encoding: "utf8",
-      timeout: 30_000,
-    });
-    expect(res.stderr).toContain("No Bitwarden instance configured");
-    expect(res.status).toBe(1);
+    try {
+      const link = join(dir, "bitwarden-mcp");
+      symlinkSync(entry, link);
+      // cwd is the empty temp dir so no .env is picked up.
+      const res = spawnSync(process.execPath, ["--import", tsxLoader, link], {
+        cwd: dir,
+        env: cleanEnv(),
+        input: "",
+        encoding: "utf8",
+        timeout: 30_000,
+      });
+      expect(res.stderr).toContain("No Bitwarden instance configured");
+      expect(res.status).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

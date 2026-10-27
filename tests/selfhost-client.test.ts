@@ -71,6 +71,23 @@ describe("SelfhostHttpClient", () => {
     expect(tokenCalls).toBe(2);
   });
 
+  it("a second 401 after the token refresh is an error, with no further refresh", async () => {
+    let tokenCalls = 0;
+    let memberCalls = 0;
+    const fetchImpl = makeFetch(async (req) => {
+      if (req.url.endsWith("/connect/token")) {
+        tokenCalls++;
+        return tokenResponse(`tok-${tokenCalls}`);
+      }
+      memberCalls++;
+      return new Response("{}", { status: 401 });
+    });
+    const c = client(fetchImpl);
+    await expect(c.request("GET", "/public/members")).rejects.toThrow(/BitwardenApiError|HTTP 401/);
+    expect(memberCalls).toBe(2);
+    expect(tokenCalls).toBe(2);
+  });
+
   it("retries on 429 honouring Retry-After", async () => {
     const sleeps: number[] = [];
     const fetchImpl = makeFetch(async (req) => {

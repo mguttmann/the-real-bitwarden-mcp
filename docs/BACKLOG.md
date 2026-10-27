@@ -22,16 +22,6 @@ change that fixes it.
 - [license-delta-lost-update] The `bw_license_*_update` tools are read-modify-write; calls in one process are serialized since 0.2.0, but separate server processes can still lose an update. Kept: the API has no conditional update (upstream).
 - [placeholder-annotations-flip] Stub and placeholder write tools are annotated read-only and have no `confirm` property; configuring Secrets Manager later changes their annotations and schema. Kept: changes the tool contract (placeholders are pinned with no properties).
 
-## Tests
-
-- [live-smoke-false-green] `tests/live-smoke.test.ts` still returns early (passes) when a tool is not registered, instead of skipping visibly.
-- [error-paths-untested] Error paths below OAuth are only partly tested (401 after refresh, wrapper 4xx/5xx mapping, server catch and log path).
-- [tautological-security-tests] Some security-labelled tests assert stub behaviour rather than code behaviour.
-- [confirm-gate-registry-test-missing] No registry-wide test that every write tool is wrapped by the confirm gate.
-- [no-stdio-e2e-and-version] CI does not start the built `dist/index.js` over stdio; that path is covered by `scripts/container-smoke.sh`, run by hand.
-- [stdio-probe-env-not-passed] `scripts/stdio-probe.mjs` in 2026-07-28 mode does not pass the environment to the spawned server.
-- [entrypoint-test-temp-dir-leak] `tests/entrypoint.test.ts` creates a `bwmcp-bin-*` temp dir with a symlink on each run and never removes it; clean it up in a `finally` or `afterAll`.
-
 ## Docs
 
 - [org-size-telemetry-in-docs] Source comments in `bw_member.ts`, `bw_group.ts` and `bw_collection.ts` still mention observed organization sizes.

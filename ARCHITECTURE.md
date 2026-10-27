@@ -102,9 +102,14 @@ confirm-gate, pagination, slim projections, error mapping, and the
 config parser. `tests/tool-contract.test.ts` pins the `tools/list`
 surface (names, required lists, property names) against
 `tests/fixtures/tool-contract.json`; `tests/protocol-versions.test.ts`
-covers protocol negotiation on the stdio wiring. The opt-in live smoke
+covers protocol negotiation on the stdio wiring. `tests/stdio-probe.test.ts`
+starts the real entry point as a child process through
+`scripts/stdio-probe.mjs` for every protocol revision and checks the tool
+contract and `serverInfo.version`; CI runs it a second time against the
+built `dist/index.js` (`STDIO_PROBE_BUILT=1`). The opt-in live smoke
 test (`tests/live-smoke.test.ts`, `npm run test:live`, which sets
-`RUN_LIVE_TESTS=1`) calls a real Bitwarden instance, read-only.
+`RUN_LIVE_TESTS=1`) calls a real Bitwarden instance, read-only; a check
+whose instance is not configured is reported as skipped.
 `scripts/container-smoke.sh` builds and probes `dist/index.js` in the
 gateway's Node image.
 

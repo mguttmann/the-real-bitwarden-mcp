@@ -4,8 +4,9 @@ import { asToolError, jsonResult } from "../_error.js";
 import { readOnly, destructive, requireString, requireOrgId } from "./_helpers.js";
 
 /** Secret without its decrypted value: cleartext is only returned by bws_secret_get_value. */
-function secretMetadata(secret: { value?: unknown }): Record<string, unknown> {
-  const { value: _value, ...metadata } = secret;
+function secretMetadata(secret: object): Record<string, unknown> {
+  // Also used for list items, whose SDK type has no value: drop one anyway.
+  const { value: _value, ...metadata } = secret as { value?: unknown };
   return metadata;
 }
 
@@ -31,7 +32,7 @@ export function makeSecretListTool(
       try {
         const org = (input.organizationId as string | undefined) ?? requireOrgId(orgId);
         const secrets = await sdk.secretList(org);
-        return jsonResult({ secrets });
+        return jsonResult({ secrets: secrets.map(secretMetadata) });
       } catch (err) {
         return asToolError(err);
       }

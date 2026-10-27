@@ -45,14 +45,18 @@ function stubSdk(overrides: Partial<SmSdkClient> = {}): SmSdkClient {
 
 describe("bws_secret_* (SDK-backed)", () => {
   it("list calls sdk.secretList with orgId and returns metadata only (no value)", async () => {
-    const sdk = stubSdk();
+    // The stub returns a value on purpose: the tool must drop it, not rely
+    // on the SDK leaving it out.
+    const sdk = stubSdk({
+      secretList: vi.fn(async () => [
+        { id: "s1", key: "DB_PASS", organizationId: "org-1", value: "FAKE-SECRET-1" },
+      ]),
+    });
     const res = await makeSecretListTool(sdk, "org-1").handler({});
     expect(sdk.secretList).toHaveBeenCalledWith("org-1");
-    const text = textOf(res);
-    // SDK list returns identifiers (no value field in response from SDK)
-    expect(text).toContain("DB_PASS");
-    // Value should not appear (identifier response doesn't include it)
-    expect(text).not.toContain("shhh");
+    expect(JSON.parse(textOf(res))).toEqual({
+      secrets: [{ id: "s1", key: "DB_PASS", organizationId: "org-1" }],
+    });
   });
 
   it("list accepts organizationId from input", async () => {

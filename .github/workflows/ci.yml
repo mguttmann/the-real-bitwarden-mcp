@@ -46,6 +46,10 @@ jobs:
       - run: npm run typecheck
       - run: npm run format:check
       - run: npm test
+      - name: Built dist/index.js over stdio (every protocol revision, tool contract, version)
+        env:
+          STDIO_PROBE_BUILT: "1"
+        run: npx vitest run tests/stdio-probe.test.ts
       - name: Tool contract (names, required lists, properties) and protocol versions
         run: npm run test:contract
 
