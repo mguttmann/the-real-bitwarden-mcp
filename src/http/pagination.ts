@@ -10,12 +10,20 @@ type FetchAllOptions = {
   maxPages: number;
   /** Token of a previous truncated result; the first request resumes there. */
   startToken?: string;
+  /** Items of the first page to skip (they were returned by the previous call). */
+  startSkip?: number;
 };
 
 type FetchAllResult<T> = {
   items: T[];
   truncated: boolean;
   continuationToken?: string;
+  /**
+   * Set when the stop fell inside a page: the token that fetched that page
+   * (undefined for the first page of the query) and how many of its items
+   * were returned, so a caller that can repeat the page may resume there.
+   */
+  resumeInPage?: { token: string | undefined; skip: number };
 };
 
 type RequestFn = <T = unknown>(
@@ -35,21 +43,27 @@ export async function fetchAllPages<T>(
   let continuationToken: string | undefined = opts.startToken || undefined;
   let pageCount = 0;
   let truncated = false;
+  let skip = opts.startSkip ?? 0;
+  let resumeInPage: { token: string | undefined; skip: number } | undefined;
 
   while (true) {
+    const pageToken = continuationToken;
     const q: Record<string, string | number | boolean | undefined | null> = { ...query };
     if (continuationToken) q.continuationToken = continuationToken;
     const res = await request<PageBody<T>>(method, path, { query: q });
     pageCount++;
     const body = res.body ?? {};
     const pageItems = body.data ?? [];
+    const pageSkip = skip;
+    skip = 0;
 
-    for (const item of pageItems) {
+    for (let i = pageSkip; i < pageItems.length; i++) {
       if (items.length >= opts.maxItems) {
         truncated = true;
+        resumeInPage = { token: pageToken, skip: i };
         break;
       }
-      items.push(item);
+      items.push(pageItems[i] as T);
     }
 
     // A stop inside a page has no resume point: the token that fetched this
@@ -72,5 +86,5 @@ export async function fetchAllPages<T>(
   if (truncated && continuationToken) {
     return { items, truncated, continuationToken };
   }
-  return { items, truncated };
+  return { items, truncated, ...(resumeInPage ? { resumeInPage } : {}) };
 }

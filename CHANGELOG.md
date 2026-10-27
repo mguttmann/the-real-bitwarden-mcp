@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `bw_event_query`: optional `limit` (integer, at least 1, capped at
+  `PAGINATION_MAX_ITEMS`) returns at most that many events and stops
+  paging once they are collected. When more exist the result is
+  `truncated: true` with a `continuationToken` to resume. A `limit` that
+  is not an integer of at least 1 is an error before any request.
+
 ### Behaviour changes
 
 - Without `confirm: "YES"`, a write tool whose preview reads the current
@@ -16,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   built and nothing was written, and ends with the scrubbed upstream
   message (`isError` stays true). With `confirm: "YES"` the error is
   unchanged.
+- `bw_event_query`: a result cut inside an API page (by `limit` or
+  `PAGINATION_MAX_ITEMS`) now returns a `continuationToken` that resumes
+  after the last returned event; before, such a result had no token. A
+  token of this kind starts with `bwmcp-skip.` and is only valid for
+  `bw_event_query` with the same `start`, `end` and filters.
 
 ## [0.3.0] - 2026-10-27
 

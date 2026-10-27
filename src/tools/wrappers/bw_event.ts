@@ -8,6 +8,30 @@ type Event = { type: number; [k: string]: unknown };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// The Public API pages events with its own token only. A stop inside a page
+// (limit or PAGINATION_MAX_ITEMS) is resumed with a token of this server:
+// the upstream token of that page plus the number of its events already
+// returned. Upstream tokens pass through unchanged.
+const IN_PAGE_TOKEN_PREFIX = "bwmcp-skip.";
+
+function encodeInPageToken(resume: { token: string | undefined; skip: number }): string {
+  return `${IN_PAGE_TOKEN_PREFIX}${resume.skip}.${resume.token ?? ""}`;
+}
+
+function decodeToken(token: string): { startToken?: string; startSkip?: number } {
+  if (!token.startsWith(IN_PAGE_TOKEN_PREFIX)) return { startToken: token };
+  const rest = token.slice(IN_PAGE_TOKEN_PREFIX.length);
+  const dot = rest.indexOf(".");
+  const skip = dot > 0 ? rest.slice(0, dot) : "";
+  if (!/^[0-9]+$/.test(skip)) {
+    throw new Error(
+      "continuationToken is not valid: pass the token a previous call returned, unchanged.",
+    );
+  }
+  const upstream = rest.slice(dot + 1);
+  return { ...(upstream ? { startToken: upstream } : {}), startSkip: Number(skip) };
+}
+
 export function makeEventQueryTool(
   client: BitwardenHttpClient,
   limits: Limits,
@@ -22,8 +46,9 @@ export function makeEventQueryTool(
       "Use at most one of actingUserId / itemId (the API applies only one filter). " +
       "ipAddress is not a filter of the Bitwarden Public API and is rejected; each returned " +
       "event carries its own ipAddress field. " +
-      "Auto-paginates with continuationToken. When a result is truncated with a " +
-      "continuationToken, call again with the same start/end/filters and that " +
+      "Auto-paginates with continuationToken. limit returns at most that many events " +
+      "(capped at PAGINATION_MAX_ITEMS). When a result is truncated with a " +
+      "continuationToken, call again with the same start/end/filters/limit and that " +
       "continuationToken to get the next events.",
     inputSchema: {
       type: "object",
@@ -41,6 +66,13 @@ export function makeEventQueryTool(
           description:
             "Resume a truncated result: the continuationToken it returned. Pass the same " +
             "start, end and filters as that call.",
+        },
+        limit: {
+          type: "integer",
+          minimum: 1,
+          description:
+            "Return at most this many events (capped at PAGINATION_MAX_ITEMS). When more " +
+            "exist, the result is truncated with a continuationToken to resume.",
         },
       },
       additionalProperties: false,
@@ -61,6 +93,18 @@ export function makeEventQueryTool(
               "one of them (actingUserId wins) and would silently ignore itemId.",
           );
         }
+        let maxItems = limits.maxItems;
+        if (input.limit !== undefined) {
+          const limit = input.limit;
+          if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1) {
+            throw new Error("limit must be an integer of at least 1.");
+          }
+          maxItems = Math.min(limit, limits.maxItems);
+        }
+        const resume =
+          typeof input.continuationToken === "string" && input.continuationToken !== ""
+            ? decodeToken(input.continuationToken)
+            : {};
         const now = new Date();
         const defaultStart = new Date(now.getTime() - MS_PER_DAY);
 
@@ -89,18 +133,15 @@ export function makeEventQueryTool(
           "GET",
           "/public/events",
           query,
-          {
-            ...limits,
-            ...(typeof input.continuationToken === "string"
-              ? { startToken: input.continuationToken }
-              : {}),
-          },
+          { ...limits, maxItems, ...resume },
         );
 
         const payload = {
           events: page.items,
           truncated: page.truncated,
-          continuationToken: page.continuationToken ?? null,
+          continuationToken:
+            page.continuationToken ??
+            (page.resumeInPage ? encodeInPageToken(page.resumeInPage) : null),
         };
 
         const oversize = maybeNoteOversize(payload, maxResponseBytes, false);

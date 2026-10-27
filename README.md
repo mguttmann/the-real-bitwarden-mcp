@@ -537,7 +537,11 @@ Optional parameters worth knowing:
   `defaultUserCollectionName` for policy type 5); it is not stored with
   the policy.
 - `bw_event_query`: `continuationToken` resumes a truncated result; pass
-  the token it returned with the same `start`, `end` and filters.
+  the token it returned with the same `start`, `end`, filters and
+  `limit`. `limit` returns at most that many events (an integer of at
+  least 1, capped at `PAGINATION_MAX_ITEMS`); when more exist the result
+  is `truncated: true` with a `continuationToken`, also when the stop
+  falls inside an API page.
   `bw_member_list`, `bw_group_list` and `bw_collection_list` take no
   token: the Public API returns those lists in one response.
 - `truncated: true` means the server stopped at `PAGINATION_MAX_ITEMS`
