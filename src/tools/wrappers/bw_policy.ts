@@ -1,5 +1,6 @@
 import type { PlannedRequest, ToolDef } from "../../types.js";
 import type { BitwardenHttpClient } from "../../http/bitwarden-http-client.js";
+import { BitwardenApiError } from "../../http/errors.js";
 import { asToolError, jsonResult } from "../_error.js";
 import { readOnly, destructive, requireInt } from "./_helpers.js";
 
@@ -47,7 +48,8 @@ export function makePolicyGetTool(client: BitwardenHttpClient): ToolDef {
 /**
  * PUT /public/policies/{type} stores `data` as sent, so a missing or null
  * value clears the policy settings. Keep the current data (GET) unless the
- * caller passes `data`.
+ * caller passes `data`. A policy type that was never saved answers 404;
+ * then `data: null` is sent, as before.
  */
 async function planPolicySet(
   client: BitwardenHttpClient,
@@ -58,9 +60,16 @@ async function planPolicySet(
   const notes: string[] = [];
   let data = input.data;
   if (!("data" in input)) {
-    const current = (await client.request<Record<string, unknown>>("GET", path)).body ?? {};
-    data = current.data ?? null;
-    notes.push("data kept from the current policy.");
+    try {
+      const current = (await client.request<Record<string, unknown>>("GET", path)).body ?? {};
+      data = current.data ?? null;
+      notes.push("data kept from the current policy.");
+    } catch (err) {
+      // 404: the policy type was never saved; PUT creates it.
+      if (!(err instanceof BitwardenApiError) || err.status !== 404) throw err;
+      data = null;
+      notes.push("no stored policy yet; data sent as null.");
+    }
   }
   return { method: "PUT", path, body: { enabled: input.enabled, data }, notes };
 }

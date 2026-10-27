@@ -20,6 +20,7 @@ change that fixes it.
 - [sm-sdk-login-blocks-startup] The SDK login runs before the stdio transport connects, so a slow identity server delays `initialize`.
 - [sdk-init-failed-misreported] A failed SDK login at startup gives the same tool error as a missing platform binary ("not available on this platform"); only the log line (`smSdk.kind`) tells them apart.
 - [bws-secret-update-wipes-note-projects] `bws_secret_update` sends an empty note and no projects when `note` / `projectIds` are omitted (full replace); documented in README, not merged with the current secret.
+- [readme-secret-update-projects-wording] The README says an omitted `projectIds` on `bws_secret_update` detaches the secret from its projects; for a machine account the server rejects such an update instead (error, nothing rotated). Reword: an omitted note becomes empty, an omitted `projectIds` makes the update fail, so pass `projectIds`. Do it in the next run that touches Secrets Manager.
 - [bws-update-no-orgid-fallback, sm-update-ignores-bws-org-id] `bws_project_update` / `bws_secret_update` need `organizationId` in the call and ignore `BWS_ORG_ID`; documented in README.
 - [sm-delete-per-item-error-hidden] `bws_project_delete` / `bws_secret_delete` report per-item SDK errors as success.
 - [sdk-napi-stale-no-arm64] `@bitwarden/sdk-napi` is still 1.0.0 with no linux-arm64 binary; watch upstream for a new release.
@@ -48,11 +49,14 @@ change that fixes it.
 - [confirm-gate-registry-test-missing] No registry-wide test that every write tool is wrapped by the confirm gate.
 - [sdk-and-wiring-untested] The Secrets Manager SDK loader (`tryLoadSmSdk`) has no unit test.
 - [no-stdio-e2e-and-version] CI does not start the built `dist/index.js` over stdio; that path is covered by `scripts/container-smoke.sh`, run by hand.
+- [entrypoint-test-temp-dir-leak] `tests/entrypoint.test.ts` creates a `bwmcp-bin-*` temp dir with a symlink on each run and never removes it; clean it up in a `finally` or `afterAll`.
 
 ## Docs
 
 - [org-size-telemetry-in-docs] Source comments in `bw_member.ts`, `bw_group.ts` and `bw_collection.ts` still mention observed organization sizes.
 - Existing tool descriptions and source comments still contain long dashes; replace them when the file is touched (descriptions are part of `tools/list`).
+- [long-dashes-in-touched-files] Files touched by the 0.2.0 change (for example `src/tools/confirm.ts` preview text, `src/tools/raw_request.ts`, `src/tools/wrappers/_helpers.ts`, `bws_machine_account.ts`, `tests/wrappers/bw_member.test.ts`) still hold old long dashes, some in tool output and descriptions. Replace them in a later run; list the changed description and preview strings in CHANGELOG (output change, not a contract change).
+- [docs-fixed-numbers] README and CHANGELOG name fixed numbers no test holds: the stdio message limit ("10 MiB", an SDK default) and the CI Node versions (only in `ci.yml`). Refer to the SDK default and `ci.yml` instead, or add a test.
 
 ## Release and repository (owner actions)
 

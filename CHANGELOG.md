@@ -72,7 +72,9 @@ parameters are unchanged (pinned by `tests/tool-contract.test.ts`).
 - **`bw_policy_set` keeps the policy data when `data` is omitted.** Before,
   it sent `data: null`, which cleared the policy settings (for example on a
   plain enable/disable). Now the current data is read first (one extra GET);
-  an explicit `data: null` still clears it.
+  an explicit `data: null` still clears it. If the policy type was never
+  saved (the GET answers 404), `data: null` is sent as before, so the first
+  enable of a policy still creates it.
 - **`accessAll` on `bw_group_create` / `bw_group_update`** (removed from the
   Bitwarden API, it was silently ignored) is no longer sent; `true` now
   returns an error and nothing is written. `false` is accepted and ignored.
