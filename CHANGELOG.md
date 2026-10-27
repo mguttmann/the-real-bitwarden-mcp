@@ -7,13 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.3.1] - 2026-10-28
 
-- `bw_event_query`: optional `limit` (integer, at least 1, capped at
-  `PAGINATION_MAX_ITEMS`) returns at most that many events and stops
-  paging once they are collected. When more exist the result is
-  `truncated: true` with a `continuationToken` to resume. A `limit` that
-  is not an integer of at least 1 is an error before any request.
+Fixes from the gateway test of 0.3.0. Tool names, parameter names and
+required lists are unchanged.
 
 ### Behaviour changes
 
@@ -29,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after the last returned event; before, such a result had no token. A
   token of this kind starts with `bwmcp-skip.` and is only valid for
   `bw_event_query` with the same `start`, `end` and filters.
+
+### Added
+
+- `bw_event_query`: optional `limit` (integer, at least 1, capped at
+  `PAGINATION_MAX_ITEMS`) returns at most that many events and stops
+  paging once they are collected. When more exist the result is
+  `truncated: true` with a `continuationToken` to resume. A `limit` that
+  is not an integer of at least 1 is an error before any request.
 
 ## [0.3.0] - 2026-10-27
 
@@ -652,7 +657,8 @@ Correction (added with 0.2.0): the shipped spec
 (`specs/public-api.spec.json`) was empty, so no generated
 `bw_<resource>_<op>_raw` tools were registered.
 
-[Unreleased]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.1.1...v0.2.0
