@@ -22,6 +22,10 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="${SMOKE_WORKDIR:-$(mktemp -d)}"
 REQUIRE_SDK="${REQUIRE_SDK:-1}"
+# 2026-07-28 is left out: stdio-probe.mjs probes that revision with the SDK
+# client (@modelcontextprotocol/client), a dev dependency that the
+# production install does not have. The tool list does not depend on the
+# protocol version; tests/protocol-versions.test.ts covers 2026-07-28.
 VERSIONS=(2025-06-18 2025-11-25)
 
 if [[ -z "$WORK" || "$WORK" == "/" ]]; then

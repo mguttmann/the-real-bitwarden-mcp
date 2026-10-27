@@ -39,7 +39,8 @@ are unchanged (`tests/tool-contract.test.ts`).
   working-directory `.env` load now sets every option explicitly, so these
   variables change nothing (which file loads, override, debug output).
   Startup with `--env-file` still skips the working-directory `.env`, and
-  nothing is written to stdout.
+  nothing is written to stdout. dotenv 17 and later no longer decrypt
+  `.env.vault` files with `DOTENV_KEY`; a plain `.env` is unaffected.
 - No other runtime or development dependency has a newer release within
   its major version.
 
@@ -50,7 +51,9 @@ are unchanged (`tests/tool-contract.test.ts`).
   production gateway does (`npm ci --omit=dev --ignore-scripts`), starts
   it from `node_modules` with `--env-file` and fake credentials on linux
   x86_64, and fails if `tools/list` differs from the tool contract or the
-  Secrets Manager SDK binary does not load. It is a required check.
+  Secrets Manager SDK binary does not load. It is a required check. It
+  probes with protocol versions 2025-06-18 and 2025-11-25; 2026-07-28
+  needs the SDK client, which the production install does not contain.
 
 ## [0.2.0] - 2026-10-27
 
