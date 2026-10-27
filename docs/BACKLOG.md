@@ -30,9 +30,8 @@ change that fixes it.
 
 ## Release and repository (owner actions)
 
-- [pvr-disabled-but-security-md-points-to-it, security-md-reporting-channel-disabled] Private vulnerability reporting is off; SECURITY.md describes the interim channel. Turn it on and update SECURITY.md (RELEASING.md, Repository settings).
-- [repo-security-features-off, no-dependabot-no-repo-security-settings] Secret scanning, push protection, Dependabot security updates and branch/tag rulesets are off (RELEASING.md lists the settings).
-- [npm-manual-publish-no-provenance] The release workflow can publish with provenance, but npm trusted publishing and `NPM_PUBLISH_ENABLED` are not configured yet (RELEASING.md).
+- [pvr-disabled-but-security-md-points-to-it, repo-security-features-off, no-dependabot-no-repo-security-settings] SECURITY.md now names private vulnerability reporting as the channel; the owner enables it, together with secret scanning, push protection, Dependabot security updates, CodeQL and the branch/tag rulesets (docs/maintainers/repo-settings.md). Unverified from the repository; check with the `gh api` calls at the end of that file.
+- [npm-manual-publish-no-provenance] The npm trusted publisher is configured (2026-10-27) but unvalidated until the first workflow publish; `NPM_PUBLISH_ENABLED` is not set yet (docs/maintainers/repo-settings.md, section 5).
 - [diverged-lines-no-safe-deploy-target, no-ci-on-prod-branch] The deployed line is a separate branch without CI; move production to a tagged release from `main`.
 - [tag-npm-mismatch-history-rewrites, release-traceability-inconsistent] Tag v0.1.0 is not the commit npm 0.1.0 was built from, and tags v0.1.0 / v0.1.1 have unrelated histories; keep the commit npm 0.1.0 names reachable. Not changed (tags are not moved).
 - [force-pushed-history-still-public] Commits removed by an earlier force push remain fetchable from GitHub by SHA.

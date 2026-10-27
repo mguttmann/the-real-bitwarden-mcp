@@ -70,7 +70,10 @@ in logs or tool error texts, and a reproducible, verifiable release chain.
    build, `npm pack`, CycloneDX SBOM via `npm sbom`, `SHA256SUMS`), attests
    them and creates the GitHub release; `npm publish --provenance` runs
    only when the owner has set `NPM_PUBLISH_ENABLED` and configured trusted
-   publishing (`RELEASING.md`). Not run yet.
+   publishing (`RELEASING.md`). Not run yet. Later in 0.2.0: the tarball
+   is published by a `./` path, and stable releases are listed in the MCP
+   Registry after the npm publish (`mcp-registry.yml`,
+   `docs/maintainers/repo-settings.md`).
 10. **No new required environment variables.**
 
 ## Out of scope

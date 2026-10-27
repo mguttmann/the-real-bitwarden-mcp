@@ -1,0 +1,122 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.mguttmann/the-real-bitwarden-mcp",
+  "title": "Bitwarden Public API and Secrets Manager (unofficial)",
+  "description": "Unofficial MCP server for the Bitwarden Public API and Secrets Manager, self-hosted or cloud.",
+  "repository": {
+    "url": "https://github.com/mguttmann/the-real-bitwarden-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/mguttmann/the-real-bitwarden-mcp#readme",
+  "version": "0.2.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "the-real-bitwarden-mcp",
+      "version": "0.2.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "BITWARDEN_SELFHOST_API_BASE",
+          "description": "Self-hosted instance: API base URL, e.g. https://vault.example.com/api. Configure all four BITWARDEN_SELFHOST_* or all four BITWARDEN_CLOUD_* variables (or both); a partial set is fatal.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "BITWARDEN_SELFHOST_IDENTITY_URL",
+          "description": "Self-hosted instance: identity URL, e.g. https://vault.example.com/identity.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "BITWARDEN_SELFHOST_CLIENT_ID",
+          "description": "Self-hosted instance: organization Public API client id (organization.<uuid>).",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "BITWARDEN_SELFHOST_CLIENT_SECRET",
+          "description": "Self-hosted instance: organization Public API client secret. It can manage members, groups, collections and policies, including creating Owners.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "BITWARDEN_CLOUD_API_BASE",
+          "description": "Bitwarden Cloud: API base URL, e.g. https://api.bitwarden.com. Used for license and subscription tools.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "BITWARDEN_CLOUD_IDENTITY_URL",
+          "description": "Bitwarden Cloud: identity URL, e.g. https://identity.bitwarden.com.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "BITWARDEN_CLOUD_CLIENT_ID",
+          "description": "Bitwarden Cloud: organization Public API client id (organization.<uuid>).",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "BITWARDEN_CLOUD_CLIENT_SECRET",
+          "description": "Bitwarden Cloud: organization Public API client secret.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "BWS_ACCESS_TOKEN",
+          "description": "Optional: Secrets Manager machine account access token; enables the bws_* tools. A malformed token is fatal at startup.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "BWS_ORG_ID",
+          "description": "Optional: organization UUID for the Secrets Manager tools, used when a call passes no organizationId.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "BWS_API_BASE",
+          "description": "Optional: Secrets Manager API base URL; defaults to BITWARDEN_SELFHOST_API_BASE.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "BWS_IDENTITY_URL",
+          "description": "Optional: Secrets Manager identity URL; defaults to BITWARDEN_SELFHOST_IDENTITY_URL.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "BITWARDEN_CONFIRM_WRITES",
+          "description": "true: write tools return a preview unless the call carries confirm \"YES\". The model sets confirm itself, so this is friction, not a security boundary.",
+          "isRequired": false,
+          "format": "boolean",
+          "default": "true"
+        },
+        {
+          "name": "BITWARDEN_READ_ONLY",
+          "description": "true: write tools stay listed but refuse to run, and bw_raw_request allows GET only.",
+          "isRequired": false,
+          "format": "boolean",
+          "default": "false"
+        },
+        {
+          "name": "LOG_LEVEL",
+          "description": "Log level of the JSON log lines on stderr.",
+          "isRequired": false,
+          "format": "string",
+          "default": "warn",
+          "choices": ["debug", "info", "warn", "error"]
+        }
+      ]
+    }
+  ]
+}

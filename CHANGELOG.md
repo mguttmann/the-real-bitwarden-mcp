@@ -303,8 +303,37 @@ out after <ms> ms`.
   security model (the confirm gate is a self-confirmation by the model,
   not a security boundary), `CLAUDE.md` for contributors using Claude
   Code, `docs/BACKLOG.md` (known minor issues).
+- Official MCP Registry listing: `server.json`
+  (`io.github.mguttmann/the-real-bitwarden-mcp`, the npm package over
+  stdio, environment variables with secrets marked) and
+  `.github/workflows/mcp-registry.yml` (GitHub OIDC, `mcp-publisher`
+  pinned by version and SHA-256, checks that npm serves the version with
+  the matching `mcpName`, skips a version already listed). `release.yml`
+  runs it for stable tags after a successful npm publish; it can also be
+  started by hand for an existing tag. `package.json` carries `mcpName`.
+- `glama.json`, so the maintainer can claim the Glama listing.
+- `NOTICE`: unofficial project, Bitwarden trademark, the optional
+  `@bitwarden/sdk-napi` dependency under the Bitwarden SDK License
+  Agreement (installed from npm, not bundled), the API spec placeholder.
+  Shipped in the npm package; README links it and says near the top that
+  the project is not made or endorsed by Bitwarden.
+- npm provenance: `publishConfig.provenance` is `true`, so every publish
+  of the package carries a provenance statement (trusted publishing from
+  `release.yml`).
+- README: installation paths (npx or npm install for local clients, a
+  pinned install with `npm ci --omit=dev --ignore-scripts` for gateways,
+  from source) and a maintenance status section;
+  `docs/maintainers/repo-settings.md` (rulesets, Actions permissions,
+  code security, npm trusted publishing, MCP Registry, Glama).
+  `SECURITY.md` names GitHub private vulnerability reporting as the
+  reporting channel.
+- `tests/release-chain.test.ts`: release workflow, npm metadata,
+  `server.json` and `glama.json` rules.
 
 ### Changed
+
+- The npm package no longer contains `ARCHITECTURE.md` (repository
+  documentation) and now contains `NOTICE`.
 
 - CI tests Node 22, 24 and 26 (was 20 and 22); actions are pinned by
   commit SHA; workflows default to `permissions: contents: read`.
@@ -338,6 +367,11 @@ out after <ms> ms`.
   its result, so the opt-in live smoke registered no instance tools. A
   check whose instance is not configured is now reported as skipped
   instead of passing without a request.
+- Release workflow: `npm-publish` names the tarball as
+  `./release/the-real-bitwarden-mcp-*.tgz`. Without the leading `./`, npm
+  reads `release/<file>.tgz` as the GitHub repository shorthand
+  `owner/repo` and the publish fails. Found before the first workflow
+  publish; `tests/release-chain.test.ts` holds the `./` prefix.
 
 ### Security
 

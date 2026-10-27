@@ -14,7 +14,10 @@ name: Release
 #                   provenance; stays off until the repository variable
 #                   NPM_PUBLISH_ENABLED is 'true' and npm trusted
 #                   publishing (OIDC) is configured on npmjs.com
-#                   (RELEASING.md)
+#                   (docs/maintainers/repo-settings.md)
+#   mcp-registry    lists the release in the official MCP Registry
+#                   (mcp-registry.yml, GitHub OIDC); stable versions only,
+#                   after a successful npm-publish
 
 on:
   push:
@@ -166,4 +169,25 @@ jobs:
           if [ "$PRERELEASE" = "true" ]; then tag=next; fi
           # Trusted publishing (OIDC) needs no token and attaches
           # provenance.
-          npm publish release/the-real-bitwarden-mcp-*.tgz --provenance --access public --tag "$tag"
+          # "./" makes it a local path: npm reads a bare "release/x.tgz"
+          # as the GitHub repository shorthand owner/repo.
+          npm publish ./release/the-real-bitwarden-mcp-*.tgz --provenance --access public --tag "$tag"
+
+  mcp-registry:
+    needs: [verify, npm-publish]
+    # Registry versions are permanent and the newest one is listed as
+    # latest, so prereleases stay out. The only package in server.json is
+    # the npm package, which the registry checks against npm, so this
+    # runs only after npm-publish succeeded (skipped while publishing is
+    # off).
+    if: >-
+      ${{ !cancelled()
+      && needs.verify.outputs.prerelease != 'true'
+      && needs.npm-publish.result == 'success' }}
+    uses: ./.github/workflows/mcp-registry.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      tag: ${{ github.ref_name }}
+      npm-published: true

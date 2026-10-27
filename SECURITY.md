@@ -5,17 +5,17 @@
 Please do not put details of a security issue into a public GitHub
 issue, pull request or discussion.
 
-GitHub private vulnerability reporting is currently **not enabled** for
-this repository (enabling it is a pending owner action, see
-[RELEASING.md](RELEASING.md#repository-settings)). Until it is on:
+Report it privately through GitHub private vulnerability reporting:
+open
+[Security Advisories > Report a vulnerability](https://github.com/mguttmann/the-real-bitwarden-mcp/security/advisories/new)
+(or the "Report a vulnerability" button on the repository's Security
+tab). Only you and the repository maintainers see the report. Include the affected version,
+the steps to reproduce and the impact; never include real credentials,
+tokens or vault data, use obvious fakes.
 
-1. Open a public issue titled "Security contact request" that contains
-   **no details** of the issue, only that you have something to report.
-2. The maintainer answers with a private channel; send the details there.
-
-Once private vulnerability reporting is enabled, use
-[Security Advisories](https://github.com/mguttmann/the-real-bitwarden-mcp/security/advisories/new)
-directly and this section will say so.
+If that form is not available to you, open a public issue titled
+"Security contact request" that contains **no details**, only that you
+have something to report; the maintainer answers with a private channel.
 
 I aim to acknowledge new reports within 7 days and to publish a fix or
 mitigation guidance within 30 days for high-severity issues.

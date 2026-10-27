@@ -10,7 +10,9 @@ assets are built by `scripts/release-assets.sh`.
    `package-lock.json` (`npm version <x.y.z> --no-git-tag-version` does
    both), move the `[Unreleased]` entries of `CHANGELOG.md` into a dated
    `[x.y.z]` section (keep "Behaviour changes" first) and add the
-   compare link at the bottom.
+   compare link at the bottom. Set the same version in `server.json`
+   (`version` and the npm package's `version`);
+   `tests/release-chain.test.ts` fails otherwise.
 2. Merge to `main` once CI is green.
 3. Tag the merge commit on `main` and push the tag:
 
@@ -24,13 +26,14 @@ assets are built by `scripts/release-assets.sh`.
 
 ## What the workflow does
 
-| Job              | What it does                                                                                                                                                                                              |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `verify`         | Fails unless the tag is `v` + `package.json` version and the tag commit is on `main`.                                                                                                                     |
-| `ci`             | Runs all of `ci.yml` on the tag commit (Node 22/24/26 build, lint, typecheck, format, tests, tool contract; `npm audit --omit=dev`; gitleaks over the full history).                                      |
-| `build`          | `npm ci`, then `scripts/release-assets.sh`: clean build, `npm pack`, a CycloneDX SBOM of the runtime dependency tree (`npm sbom`), `SHA256SUMS`.                                                          |
-| `github-release` | Build provenance attestation (`actions/attest-build-provenance`) for the tarball and the SBOM, then a GitHub release with tarball, SBOM and `SHA256SUMS`. An existing release is never overwritten.       |
-| `npm-publish`    | Only when the repository variable `NPM_PUBLISH_ENABLED` is `true`: checks the tarball against `SHA256SUMS` and runs `npm publish --provenance` through trusted publishing (OIDC). No npm token is stored. |
+| Job              | What it does                                                                                                                                                                                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verify`         | Fails unless the tag is `v` + `package.json` version and the tag commit is on `main`.                                                                                                                                                                       |
+| `ci`             | Runs all of `ci.yml` on the tag commit (Node 22/24/26 build, lint, typecheck, format, tests, tool contract; `npm audit --omit=dev`; gitleaks over the full history).                                                                                        |
+| `build`          | `npm ci`, then `scripts/release-assets.sh`: clean build, `npm pack`, a CycloneDX SBOM of the runtime dependency tree (`npm sbom`), `SHA256SUMS`.                                                                                                            |
+| `github-release` | Build provenance attestation (`actions/attest-build-provenance`) for the tarball and the SBOM, then a GitHub release with tarball, SBOM and `SHA256SUMS`. An existing release is never overwritten.                                                         |
+| `npm-publish`    | Only when the repository variable `NPM_PUBLISH_ENABLED` is `true`: checks the tarball against `SHA256SUMS` and runs `npm publish --provenance` through trusted publishing (OIDC). No npm token is stored.                                                   |
+| `mcp-registry`   | Stable tags only, after a successful `npm-publish`: runs `mcp-registry.yml`, which waits until npm serves the version with the right `mcpName` and publishes `server.json` to the official MCP Registry (GitHub OIDC). A version already listed is skipped. |
 
 The assets can be built locally the same way (Linux, after `npm ci`):
 
@@ -46,38 +49,20 @@ gh attestation verify the-real-bitwarden-mcp-X.Y.Z.tgz --repo mguttmann/the-real
 npm audit signatures   # in a project that installed the package
 ```
 
-## Repository settings
+## Repository, npm and registry settings
 
 A workflow cannot set these; the repository owner applies them once.
-Status at the time of writing: private vulnerability reporting, secret
-scanning, push protection, Dependabot security updates and branch
-protection are off.
+They are described in
+[docs/maintainers/repo-settings.md](docs/maintainers/repo-settings.md):
+rulesets for `main` and `v*` tags, Actions permissions, code security
+(private vulnerability reporting, Dependabot, secret scanning with push
+protection, CodeQL), npm trusted publishing, the MCP Registry and Glama.
 
-1. **Code security** (Settings > Code security): turn on private
-   vulnerability reporting (then update the reporting section of
-   `SECURITY.md`), Dependabot alerts and security updates, secret
-   scanning with push protection.
-2. **Ruleset for `main`**: block force pushes and deletions, require
-   pull requests and the CI checks `build-test (22)`, `build-test (24)`,
-   `build-test (26)`, `audit` and `gitleaks`.
-3. **Ruleset for tags `v*`**: restrict updates and deletions, so a
-   released tag cannot move.
-4. **Actions** (Settings > Actions > General): default workflow
-   permissions read-only; every workflow declares its own `permissions`.
-
-## npm trusted publishing
-
-The `npm-publish` job stays off until both steps are done:
-
-1. On npmjs.com, package `the-real-bitwarden-mcp`, Settings, Trusted
-   Publisher: add GitHub Actions with owner `mguttmann`, repository
-   `the-real-bitwarden-mcp`, workflow file `release.yml`, no environment.
-   The package already exists (0.1.0 and 0.1.1 were published by hand),
-   so no bootstrap publish is needed. Provenance requires the repository
-   to stay public.
-2. In the GitHub repository, Settings > Secrets and variables > Actions >
-   Variables: set `NPM_PUBLISH_ENABLED` to `true`.
-
-Optionally, after the first publish through the workflow, disallow
-token-based publishing in the npm package settings so only the workflow
-can publish.
+Status on 2026-10-27: the npm trusted publisher (repository
+`mguttmann/the-real-bitwarden-mcp`, workflow `release.yml`, no
+environment) was configured by the owner. It is validated only by the
+first workflow publish: set the repository variable `NPM_PUBLISH_ENABLED`
+to `true` before pushing the next release tag, then check that
+`npm-publish` succeeds and npmjs.com shows a provenance statement for the
+version. Until the variable is `true`, `npm-publish` and `mcp-registry`
+are skipped.

@@ -1,7 +1,8 @@
 {
   "name": "the-real-bitwarden-mcp",
+  "mcpName": "io.github.mguttmann/the-real-bitwarden-mcp",
   "version": "0.2.0",
-  "description": "Local stdio MCP server for the Bitwarden Public API and Secrets Manager: members, groups, collections, policies, license seats, SM projects and secrets.",
+  "description": "Unofficial local stdio MCP server for the Bitwarden Public API and Secrets Manager: members, groups, collections, policies, license seats, SM projects and secrets. Not affiliated with Bitwarden Inc.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -10,14 +11,15 @@
   "files": [
     "dist/",
     "README.md",
-    "ARCHITECTURE.md",
     "CHANGELOG.md",
     "SECURITY.md",
+    "NOTICE",
     "LICENSE",
     ".env.example"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "author": "Manuel Guttmann",
   "license": "MIT",

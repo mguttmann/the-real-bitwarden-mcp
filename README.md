@@ -6,6 +6,10 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](tsconfig.json)
 [![CI](https://github.com/mguttmann/the-real-bitwarden-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/mguttmann/the-real-bitwarden-mcp/actions/workflows/ci.yml)
 
+> **Unofficial.** This project is not made by, affiliated with or endorsed
+> by Bitwarden Inc. "Bitwarden" is a trademark of Bitwarden Inc. See
+> [NOTICE](NOTICE).
+
 A local [Model Context Protocol](https://modelcontextprotocol.io) (stdio)
 server that exposes Bitwarden's Public API (organization management) and
 the Bitwarden Secrets Manager (projects + secrets via the official
@@ -20,6 +24,21 @@ the official Bitwarden Cloud, or both.
 [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) ·
 [Releasing](RELEASING.md) · [Changelog](CHANGELOG.md) ·
 [Issues](https://github.com/mguttmann/the-real-bitwarden-mcp/issues)
+
+### Maintenance status
+
+- Maintained on a best-effort basis by one maintainer
+  ([@mguttmann](https://github.com/mguttmann)) in spare time. The author
+  uses it in production. There is no support contract and no guaranteed
+  response time.
+- Security fixes take priority over features. Report vulnerabilities
+  privately as described in [SECURITY.md](SECURITY.md), never in a
+  public issue.
+- Dependency updates come from Dependabot; CI fails when a runtime
+  dependency has a known advisory.
+- Only the latest minor release gets fixes.
+- Issues and pull requests are welcome; see
+  [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Features
 
@@ -148,15 +167,64 @@ If Bitwarden releases an SDK version with binaries for a new platform,
 updating the dependency and the lockfile picks it up; no code change is
 needed.
 
-## Setup
+## Installation
+
+The package is [`the-real-bitwarden-mcp`](https://www.npmjs.com/package/the-real-bitwarden-mcp)
+on npm, published from GitHub Actions with
+[provenance](https://docs.npmjs.com/generating-provenance-statements). Its
+bin is `bitwarden-mcp`. Configuration is the same for every path (see
+[Configuration](#configuration)).
+
+### Local MCP clients (npx or npm install)
+
+`npx` fetches and starts the package; pin a version so an update is a
+decision, not a side effect of a restart:
 
 ```bash
-git clone <repo-url>
-cd <repo>
+npx -y the-real-bitwarden-mcp@<version>
+```
+
+Or install it once and start the bin:
+
+```bash
+npm install -g the-real-bitwarden-mcp@<version>
+bitwarden-mcp
+```
+
+See [Connector wiring](#connector-wiring) for client configs.
+
+### Gateways and servers (pinned, from npm)
+
+Install a pinned version with a lockfile and start it with `node`, without
+`npx` and without install scripts. Once, in an empty directory:
+
+```bash
+npm init -y
+npm install --save-exact the-real-bitwarden-mcp@<version>   # writes package-lock.json
+```
+
+Commit or keep `package.json` and `package-lock.json`. On every deploy:
+
+```bash
+npm ci --omit=dev --ignore-scripts
+node --env-file=/path/to/.env node_modules/the-real-bitwarden-mcp/dist/index.js
+```
+
+The package has no install script and no runtime dependency in
+`devDependencies`, so `--omit=dev --ignore-scripts` is a complete install.
+The Secrets Manager SDK binary is an optional per-platform package that
+npm selects by OS and CPU; it needs no script either.
+
+### From source
+
+```bash
+git clone https://github.com/mguttmann/the-real-bitwarden-mcp.git
+cd the-real-bitwarden-mcp
 npm ci               # also pulls the platform-specific SDK binary
 cp .env.example .env
 # Fill in .env, see "Configuration".
 npm run build
+node --env-file=.env dist/index.js
 ```
 
 The SDK binary is an optional dependency: `npm ci` succeeds even on
@@ -322,7 +390,26 @@ npm run inspector      # open the MCP Inspector against the built bundle
 ### Claude Desktop
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`
-(macOS) or the platform equivalent:
+(macOS) or the platform equivalent. From npm:
+
+```json
+{
+  "mcpServers": {
+    "bitwarden": {
+      "command": "npx",
+      "args": ["-y", "the-real-bitwarden-mcp@<version>"],
+      "env": {
+        "BITWARDEN_SELFHOST_API_BASE": "https://vault.example.com/api",
+        "BITWARDEN_SELFHOST_IDENTITY_URL": "https://vault.example.com/identity",
+        "BITWARDEN_SELFHOST_CLIENT_ID": "organization.<uuid>",
+        "BITWARDEN_SELFHOST_CLIENT_SECRET": "<client secret>"
+      }
+    }
+  }
+}
+```
+
+From a source checkout:
 
 ```json
 {
@@ -355,7 +442,10 @@ claude mcp add bitwarden -- node --env-file=/absolute/path/to/.env /absolute/pat
 ### Gateway and headless use
 
 The server speaks MCP over stdio only and needs no terminal. A gateway or
-supervisor starts it like this:
+supervisor installs the pinned npm package (see
+[Gateways and servers](#gateways-and-servers-pinned-from-npm)) and starts
+it with `node --env-file=/path/to/.env node_modules/the-real-bitwarden-mcp/dist/index.js`,
+or builds a source checkout:
 
 ```bash
 npm ci --no-audit --no-fund && npm run build
@@ -566,4 +656,7 @@ reason (client not found vs. secret mismatch).
 
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE). [NOTICE](NOTICE) covers what the MIT
+License does not: the trademark, the optional `@bitwarden/sdk-napi`
+dependency (Bitwarden SDK License Agreement, installed from npm, not
+bundled) and the API specification.
