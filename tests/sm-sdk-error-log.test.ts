@@ -17,7 +17,7 @@ describe("reportSmSdkError", () => {
     });
     const logger = createLogger("warn", stream);
     reportSmSdkError(logger, {
-      kind: "init_failed",
+      kind: "binary_not_available",
       message:
         "login failed for 0.00000000-0000-0000-0000-000000000000.RkFLRQ==:RkFLRQ== Bearer FAKE-TOKEN-1\nRequire stack:\n- /home/FAKE-USER/app/node_modules/@bitwarden/sdk-napi/binding.js",
     });
@@ -29,6 +29,6 @@ describe("reportSmSdkError", () => {
     expect(line.level).toBe(40);
     expect(line.msg).toMatch(/sm-sdk: failed to load/);
     expect(line.msg).toMatch(/bws_project_\* and bws_secret_\*/);
-    expect(line.smSdk.kind).toBe("init_failed");
+    expect(line.smSdk.kind).toBe("binary_not_available");
   });
 });

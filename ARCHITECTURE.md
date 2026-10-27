@@ -56,7 +56,10 @@ BitwardenHttpClient       BitwardenHttpClient         SmHttpClient (REST)
 binaries for common platforms but may be missing on yours.
 `tryLoadSmSdk()` dynamic-imports it, surfaces a structured error, and
 the server still starts. SM tools then return a clear "SDK not
-available" error per call instead of crashing the process. Machine
+available" error per call instead of crashing the process. The SDK
+login runs on the first SDK call, not at startup, so `initialize` never
+waits for the identity server; login and calls are bounded by
+`HTTP_TIMEOUT_MS`, and a failed login is retried by the next call. Machine
 accounts and access tokens are intentionally **web-vault stubs**: the
 Public API does not expose them with the required crypto layer.
 

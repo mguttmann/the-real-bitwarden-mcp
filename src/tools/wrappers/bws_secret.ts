@@ -106,19 +106,22 @@ export function makeSecretCreateTool(
   };
 }
 
-export function makeSecretUpdateTool(sdk: SmSdkClient | undefined): ToolDef {
+export function makeSecretUpdateTool(
+  sdk: SmSdkClient | undefined,
+  orgId: string | undefined,
+): ToolDef {
   return {
     name: "bws_secret_update",
     description:
-      "Update a Secrets Manager secret (key/value/note/projects). Destructive. Returns the secret metadata without the value.",
+      "Update a Secrets Manager secret (key/value/note/projects). Destructive. An omitted note or projectIds keeps the current value. Returns the secret metadata without the value.",
     inputSchema: {
       type: "object",
       properties: {
         id: { type: "string" },
         key: { type: "string" },
         value: { type: "string" },
-        note: { type: "string", default: "" },
-        projectIds: { type: "array", items: { type: "string" }, default: [] },
+        note: { type: "string" },
+        projectIds: { type: "array", items: { type: "string" } },
         organizationId: { type: "string" },
       },
       required: ["id", "key", "value"],
@@ -129,16 +132,18 @@ export function makeSecretUpdateTool(sdk: SmSdkClient | undefined): ToolDef {
       if (!sdk) return asToolError(new Error(SDK_UNAVAILABLE_MSG));
       try {
         const id = requireString(input, "id");
-        const orgId = input.organizationId as string | undefined;
-        if (!orgId) return asToolError(new Error("organizationId required for secret update."));
-        const secret = await sdk.secretUpdate(
-          orgId,
-          id,
-          requireString(input, "key"),
-          requireString(input, "value"),
-          typeof input.note === "string" ? input.note : "",
-          (input.projectIds as string[] | undefined) ?? [],
-        );
+        const org = (input.organizationId as string | undefined) ?? requireOrgId(orgId);
+        const key = requireString(input, "key");
+        const value = requireString(input, "value");
+        // The SDK update replaces the whole secret: carry over what the caller left out.
+        let note = typeof input.note === "string" ? input.note : undefined;
+        let projectIds = input.projectIds as string[] | undefined;
+        if (note === undefined || projectIds === undefined) {
+          const current = await sdk.secretGet(id);
+          note ??= current.note ?? "";
+          projectIds ??= current.projectId ? [current.projectId] : [];
+        }
+        const secret = await sdk.secretUpdate(org, id, key, value, note, projectIds);
         return jsonResult(secretMetadata(secret));
       } catch (err) {
         return asToolError(err);

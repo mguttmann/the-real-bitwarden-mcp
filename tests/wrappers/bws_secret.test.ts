@@ -105,7 +105,7 @@ describe("bws_secret_* (SDK-backed)", () => {
       key: "DB_PASS",
       value: "FAKE-SECRET-1",
     });
-    const updated = await makeSecretUpdateTool(sdk).handler({
+    const updated = await makeSecretUpdateTool(sdk, undefined).handler({
       id: "s2",
       key: "DB_PASS",
       value: "FAKE-SECRET-1",
@@ -126,7 +126,7 @@ describe("bws_secret_* (SDK-backed)", () => {
 
   it("update calls sdk.secretUpdate with all params", async () => {
     const sdk = stubSdk();
-    await makeSecretUpdateTool(sdk).handler({
+    await makeSecretUpdateTool(sdk, undefined).handler({
       id: "s1",
       key: "K",
       value: "V2",
@@ -137,15 +137,95 @@ describe("bws_secret_* (SDK-backed)", () => {
     expect(sdk.secretUpdate).toHaveBeenCalledWith("org-1", "s1", "K", "V2", "n", ["p1"]);
   });
 
-  it("update requires organizationId", async () => {
+  it("update without organizationId and without BWS_ORG_ID is an error", async () => {
     const sdk = stubSdk();
-    const res = await makeSecretUpdateTool(sdk).handler({ id: "s1", key: "K", value: "V2" });
+    const res = await makeSecretUpdateTool(sdk, undefined).handler({
+      id: "s1",
+      key: "K",
+      value: "V2",
+    });
     expect(res.isError).toBe(true);
-    expect(textOf(res)).toMatch(/organizationId/i);
+    expect(textOf(res)).toMatch(/BWS_ORG_ID/);
+    expect(sdk.secretUpdate).not.toHaveBeenCalled();
+  });
+
+  // Audit cases bws-update-no-orgid-fallback, sm-update-ignores-bws-org-id.
+  it("update falls back to the configured BWS_ORG_ID", async () => {
+    const sdk = stubSdk();
+    const res = await makeSecretUpdateTool(sdk, "org-1").handler({
+      id: "s1",
+      key: "K",
+      value: "V2",
+      note: "n",
+      projectIds: ["p1"],
+    });
+    expect(res.isError).toBeUndefined();
+    expect(sdk.secretUpdate).toHaveBeenCalledWith("org-1", "s1", "K", "V2", "n", ["p1"]);
+  });
+
+  // Audit case bws-secret-update-wipes-note-projects: the SDK update is a full
+  // replace; omitted fields were sent as "" and [].
+  it("update keeps the current note and project for omitted note and projectIds", async () => {
+    const sdk = stubSdk({
+      secretGet: vi.fn(async () => ({
+        id: "s1",
+        key: "K",
+        value: "FAKE-SECRET-1",
+        note: "keep me",
+        organizationId: "org-1",
+        projectId: "p9",
+      })),
+    });
+    const tool = makeSecretUpdateTool(sdk, "org-1");
+    await tool.handler({ id: "s1", key: "K", value: "V2" });
+    expect(sdk.secretGet).toHaveBeenCalledWith("s1");
+    expect(sdk.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", "keep me", ["p9"]);
+    await tool.handler({ id: "s1", key: "K", value: "V2", projectIds: ["p2"] });
+    expect(sdk.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", "keep me", ["p2"]);
+    await tool.handler({ id: "s1", key: "K", value: "V2", note: "" });
+    expect(sdk.secretUpdate).toHaveBeenLastCalledWith("org-1", "s1", "K", "V2", "", ["p9"]);
+  });
+
+  it("update does not read the secret when note and projectIds are given", async () => {
+    const sdk = stubSdk();
+    await makeSecretUpdateTool(sdk, "org-1").handler({
+      id: "s1",
+      key: "K",
+      value: "V2",
+      note: "n",
+      projectIds: [],
+    });
+    expect(sdk.secretGet).not.toHaveBeenCalled();
+    expect(sdk.secretUpdate).toHaveBeenCalledWith("org-1", "s1", "K", "V2", "n", []);
+  });
+
+  it("update does not change the secret when reading the current one fails", async () => {
+    const sdk = stubSdk({
+      secretGet: vi.fn(async () => {
+        throw new Error("Secret not found.");
+      }),
+    });
+    const res = await makeSecretUpdateTool(sdk, "org-1").handler({
+      id: "s1",
+      key: "K",
+      value: "V",
+    });
+    expect(res.isError).toBe(true);
+    expect(textOf(res)).toContain("Secret not found.");
+    expect(sdk.secretUpdate).not.toHaveBeenCalled();
+  });
+
+  it("update schema advertises no defaults for note and projectIds", () => {
+    const props = makeSecretUpdateTool(undefined, undefined).inputSchema.properties as Record<
+      string,
+      Record<string, unknown>
+    >;
+    expect(props.note).not.toHaveProperty("default");
+    expect(props.projectIds).not.toHaveProperty("default");
   });
 
   it("update returns isError when sdk is undefined", async () => {
-    const res = await makeSecretUpdateTool(undefined).handler({
+    const res = await makeSecretUpdateTool(undefined, undefined).handler({
       id: "s1",
       key: "K",
       value: "V2",

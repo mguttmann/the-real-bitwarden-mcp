@@ -11,14 +11,7 @@ change that fixes it.
 
 ## Secrets Manager
 
-- [sdk-calls-no-timeout] Secrets Manager SDK calls and the startup login have no timeout.
-- [sm-sdk-login-blocks-startup] The SDK login runs before the stdio transport connects, so a slow identity server delays `initialize`.
-- [sdk-init-failed-misreported] A failed SDK login at startup gives the same tool error as a missing platform binary ("not available on this platform"); only the log line (`smSdk.kind`) tells them apart.
-- [bws-secret-update-wipes-note-projects] `bws_secret_update` sends an empty note and no projects when `note` / `projectIds` are omitted (full replace); documented in README, not merged with the current secret.
-- [readme-secret-update-projects-wording] The README says an omitted `projectIds` on `bws_secret_update` detaches the secret from its projects; for a machine account the server rejects such an update instead (error, nothing rotated). Reword: an omitted note becomes empty, an omitted `projectIds` makes the update fail, so pass `projectIds`. Do it in the next run that touches Secrets Manager.
-- [bws-update-no-orgid-fallback, sm-update-ignores-bws-org-id] `bws_project_update` / `bws_secret_update` need `organizationId` in the call and ignore `BWS_ORG_ID`; documented in README.
-- [sm-delete-per-item-error-hidden] `bws_project_delete` / `bws_secret_delete` report per-item SDK errors as success.
-- [sdk-napi-stale-no-arm64] `@bitwarden/sdk-napi` is still 1.0.0 with no linux-arm64 binary; watch upstream for a new release.
+- [sdk-napi-stale-no-arm64] `@bitwarden/sdk-napi` is still 1.0.0 with no linux-arm64 binary; watch upstream for a new release. Kept: upstream action (npm still lists 1.0.0 as latest, checked 2026-10-27).
 
 ## Tools and schemas
 
@@ -44,7 +37,6 @@ change that fixes it.
 - [error-paths-untested] Error paths below OAuth are only partly tested (401 after refresh, wrapper 4xx/5xx mapping, server catch and log path).
 - [tautological-security-tests] Some security-labelled tests assert stub behaviour rather than code behaviour.
 - [confirm-gate-registry-test-missing] No registry-wide test that every write tool is wrapped by the confirm gate.
-- [sdk-and-wiring-untested] The Secrets Manager SDK loader (`tryLoadSmSdk`) has no unit test.
 - [no-stdio-e2e-and-version] CI does not start the built `dist/index.js` over stdio; that path is covered by `scripts/container-smoke.sh`, run by hand.
 - [stdio-probe-env-not-passed] `scripts/stdio-probe.mjs` in 2026-07-28 mode does not pass the environment to the spawned server.
 - [entrypoint-test-temp-dir-leak] `tests/entrypoint.test.ts` creates a `bwmcp-bin-*` temp dir with a symlink on each run and never removes it; clean it up in a `finally` or `afterAll`.

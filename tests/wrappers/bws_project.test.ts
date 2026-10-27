@@ -105,7 +105,7 @@ describe("bws_project_* (SDK-backed)", () => {
 
   it("update calls sdk.projectUpdate", async () => {
     const sdk = stubSdk();
-    const res = await makeProjectUpdateTool(sdk).handler({
+    const res = await makeProjectUpdateTool(sdk, undefined).handler({
       id: "p1",
       name: "renamed",
       organizationId: "org-1",
@@ -114,15 +114,24 @@ describe("bws_project_* (SDK-backed)", () => {
     expect(textOf(res)).toContain("renamed");
   });
 
-  it("update requires organizationId", async () => {
+  it("update without organizationId and without BWS_ORG_ID is an error", async () => {
     const sdk = stubSdk();
-    const res = await makeProjectUpdateTool(sdk).handler({ id: "p1", name: "renamed" });
+    const res = await makeProjectUpdateTool(sdk, undefined).handler({ id: "p1", name: "renamed" });
     expect(res.isError).toBe(true);
-    expect(textOf(res)).toMatch(/organizationId/i);
+    expect(textOf(res)).toMatch(/BWS_ORG_ID/);
+    expect(sdk.projectUpdate).not.toHaveBeenCalled();
+  });
+
+  // Audit cases bws-update-no-orgid-fallback, sm-update-ignores-bws-org-id.
+  it("update falls back to the configured BWS_ORG_ID", async () => {
+    const sdk = stubSdk();
+    const res = await makeProjectUpdateTool(sdk, "org-1").handler({ id: "p1", name: "renamed" });
+    expect(res.isError).toBeUndefined();
+    expect(sdk.projectUpdate).toHaveBeenCalledWith("org-1", "p1", "renamed");
   });
 
   it("update returns isError when sdk is undefined", async () => {
-    const res = await makeProjectUpdateTool(undefined).handler({
+    const res = await makeProjectUpdateTool(undefined, undefined).handler({
       id: "p1",
       name: "renamed",
       organizationId: "org-1",

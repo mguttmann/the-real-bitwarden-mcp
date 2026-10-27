@@ -199,6 +199,30 @@ out after <ms> ms`.
   60 s before expiry, or after half its lifetime when that is shorter;
   before, a token with `expires_in` of 60 s or less was fetched anew for
   every request.
+- **Secrets Manager SDK login is lazy and bounded.** The SDK logs in on
+  the first `bws_project_*` / `bws_secret_*` call instead of at startup,
+  so `initialize` no longer waits for the identity server. The login and
+  every SDK call are bounded by `HTTP_TIMEOUT_MS` (before: no timeout); a
+  timed-out write says it may or may not have been applied. A failed
+  login now returns "Secrets Manager SDK login failed: ..." (or "login
+  timed out") from the tool call and is retried by the next call; before,
+  it was logged at startup as `smSdk.kind: init_failed` and every call
+  answered "not available on this platform" until a restart. The
+  `init_failed` kind is gone from the startup log line.
+- **`bws_secret_update` keeps the note and project for omitted
+  fields.** The SDK update replaces the whole secret; an omitted `note`
+  was sent as `""` and omitted `projectIds` as `[]` (which the server
+  rejects for a machine account). Now the current secret is read first
+  (one extra SDK call) and its note and project are carried over. The
+  schema no longer advertises `default: ""` / `default: []` for these two
+  fields and the description says so.
+- **`bws_project_update` / `bws_secret_update` fall back to
+  `BWS_ORG_ID`** when `organizationId` is not passed, like the list and
+  create tools (before: "organizationId required for ... update.").
+  Without either, the error asks for `BWS_ORG_ID`.
+- **`bws_project_delete` / `bws_secret_delete` report per-item SDK
+  errors** (for example not found or no access) as a tool error naming
+  the id; before they returned the SDK response as a success.
 - **Long upstream error texts are cut** to 2000 characters in tool
   errors, followed by `... [truncated, <n> chars]` (before: a proxy's HTML
   error page went into the tool error in full).

@@ -100,7 +100,9 @@ Out of scope:
   answer is an error.
 - `HTTP_TIMEOUT_MS` bounds API requests and the OAuth token request; a
   request that timed out is not retried.
-  Calls into the Secrets Manager SDK have no timeout of their own.
+  The same deadline bounds the Secrets Manager SDK login and each SDK
+  call; the native call cannot be cancelled, so a timed-out SDK write
+  may or may not have been applied.
 - Writes (POST, PUT, PATCH, DELETE) are not retried after a 5xx or a
   network error; only a 429 answer (request not processed) is retried
   for every method. Both cases report that the write may or may not have

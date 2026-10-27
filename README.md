@@ -187,26 +187,26 @@ not an `http://` or `https://` URL or that has a query or fragment (the
 error names the variable). Invalid values of the optional numeric and
 boolean variables fall back to the default.
 
-| Variable                           | Required when                 | Purpose                                                                      |
-| ---------------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| `BITWARDEN_SELFHOST_API_BASE`      | self-host mode                | `https://vault.example.com/api`                                              |
-| `BITWARDEN_SELFHOST_IDENTITY_URL`  | self-host mode                | `https://vault.example.com/identity`                                         |
-| `BITWARDEN_SELFHOST_CLIENT_ID`     | self-host mode                | Public-API client id (`organization.{orgId}`)                                |
-| `BITWARDEN_SELFHOST_CLIENT_SECRET` | self-host mode                | Public-API client secret                                                     |
-| `BITWARDEN_CLOUD_API_BASE`         | cloud mode                    | `https://api.bitwarden.com`                                                  |
-| `BITWARDEN_CLOUD_IDENTITY_URL`     | cloud mode                    | `https://identity.bitwarden.com`                                             |
-| `BITWARDEN_CLOUD_CLIENT_ID`        | cloud mode                    | Public-API client id (cloud)                                                 |
-| `BITWARDEN_CLOUD_CLIENT_SECRET`    | cloud mode                    | Public-API client secret (cloud)                                             |
-| `BWS_ACCESS_TOKEN`                 | SM tools                      | Machine-account access token (3-part format, see below); malformed is fatal  |
-| `BWS_API_BASE`                     | SM tools (optional)           | Defaults to selfhost API base                                                |
-| `BWS_IDENTITY_URL`                 | SM tools (optional)           | Defaults to selfhost identity URL                                            |
-| `BWS_ORG_ID`                       | SM project/secret create/list | Organization UUID, used when `organizationId` is not passed                  |
-| `BITWARDEN_CONFIRM_WRITES`         |                               | default `true`: write tools return a preview unless `confirm: "YES"`         |
-| `LOG_LEVEL`                        |                               | `debug` \| `info` \| `warn` (default) \| `error`                             |
-| `HTTP_TIMEOUT_MS`                  |                               | default 30000; applies to API and OAuth token requests                       |
-| `PAGINATION_MAX_ITEMS`             |                               | default 1000                                                                 |
-| `PAGINATION_MAX_PAGES`             |                               | default 20                                                                   |
-| `BW_MCP_MAX_LIST_RESPONSE_BYTES`   |                               | default 60000; adds a `note` warning to list responses that exceed this size |
+| Variable                           | Required when           | Purpose                                                                      |
+| ---------------------------------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `BITWARDEN_SELFHOST_API_BASE`      | self-host mode          | `https://vault.example.com/api`                                              |
+| `BITWARDEN_SELFHOST_IDENTITY_URL`  | self-host mode          | `https://vault.example.com/identity`                                         |
+| `BITWARDEN_SELFHOST_CLIENT_ID`     | self-host mode          | Public-API client id (`organization.{orgId}`)                                |
+| `BITWARDEN_SELFHOST_CLIENT_SECRET` | self-host mode          | Public-API client secret                                                     |
+| `BITWARDEN_CLOUD_API_BASE`         | cloud mode              | `https://api.bitwarden.com`                                                  |
+| `BITWARDEN_CLOUD_IDENTITY_URL`     | cloud mode              | `https://identity.bitwarden.com`                                             |
+| `BITWARDEN_CLOUD_CLIENT_ID`        | cloud mode              | Public-API client id (cloud)                                                 |
+| `BITWARDEN_CLOUD_CLIENT_SECRET`    | cloud mode              | Public-API client secret (cloud)                                             |
+| `BWS_ACCESS_TOKEN`                 | SM tools                | Machine-account access token (3-part format, see below); malformed is fatal  |
+| `BWS_API_BASE`                     | SM tools (optional)     | Defaults to selfhost API base                                                |
+| `BWS_IDENTITY_URL`                 | SM tools (optional)     | Defaults to selfhost identity URL                                            |
+| `BWS_ORG_ID`                       | SM project/secret tools | Organization UUID, used when `organizationId` is not passed                  |
+| `BITWARDEN_CONFIRM_WRITES`         |                         | default `true`: write tools return a preview unless `confirm: "YES"`         |
+| `LOG_LEVEL`                        |                         | `debug` \| `info` \| `warn` (default) \| `error`                             |
+| `HTTP_TIMEOUT_MS`                  |                         | default 30000; applies to API and OAuth token requests and SM SDK calls      |
+| `PAGINATION_MAX_ITEMS`             |                         | default 1000                                                                 |
+| `PAGINATION_MAX_PAGES`             |                         | default 20                                                                   |
+| `BW_MCP_MAX_LIST_RESPONSE_BYTES`   |                         | default 60000; adds a `note` warning to list responses that exceed this size |
 
 ### Mode matrix
 
@@ -426,10 +426,16 @@ an error if the total did not change.
 - Secrets: `bws_secret_list` (identifiers only), `bws_secret_get_value`,
   `bws_secret_create`, `bws_secret_update`, `bws_secret_delete`
 
-`bws_project_update` and `bws_secret_update` need `organizationId` in the
-call; they do not fall back to `BWS_ORG_ID`. `bws_secret_update` replaces
-the whole secret: an omitted `note` becomes empty and omitted
-`projectIds` detach the secret from its projects.
+Without `organizationId` in the call, every `bws_project_*` /
+`bws_secret_*` tool that needs one uses `BWS_ORG_ID`. `bws_secret_update`
+keeps the current note and project when `note` or `projectIds` is
+omitted (it reads the secret first); pass them to change them. A machine
+account cannot remove all projects from a secret: the server rejects an
+update with `projectIds: []` for a secret that is in a project.
+
+The SDK logs in with `BWS_ACCESS_TOKEN` on the first `bws_*` call, not at
+startup; the login and each SDK call are bounded by `HTTP_TIMEOUT_MS`. A
+timed-out write may or may not have been applied.
 
 ### Secrets Manager: web vault only (always stubbed)
 
@@ -507,13 +513,15 @@ curl -sS "https://vault.example.com/api/organizations/{ORG_ID}/projects" \
 
 ### `bws_*` tools return "SDK not available on this platform"
 
-Either the `@bitwarden/sdk-napi` native binary is not available for the
-current platform (see the Platform support table above), or the SDK loaded
-but its login with `BWS_ACCESS_TOKEN` failed at startup (wrong token,
-identity server unreachable). Both give the same tool error. The startup
-`warn` log line on stderr tells them apart: `smSdk.kind` is
-`module_not_found` or `binary_not_available` for the platform case and
-`init_failed` for a failed login.
+The `@bitwarden/sdk-napi` native binary is not available for the current
+platform (see the Platform support table above). The startup `warn` log
+line on stderr has the reason in `smSdk.kind` (`module_not_found` or
+`binary_not_available`).
+
+A failed login (wrong token, identity server unreachable) gives a
+different tool error, "Secrets Manager SDK login failed: ..." or "...
+login timed out ...". Fix the token or URLs; the next `bws_*` call logs
+in again, no restart needed.
 
 On unsupported platforms, all Public-API tools (`bw_*`) continue to work
 normally. Only the `bws_project_*` and `bws_secret_*` tools are affected.

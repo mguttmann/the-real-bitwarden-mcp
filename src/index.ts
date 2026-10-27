@@ -153,6 +153,7 @@ export async function buildClients(
   let smSdk: SmSdkClient | undefined;
   let smSdkError: SmSdkLoadError | undefined;
   if (config.sm) {
+    // Loads the module only; the SDK logs in on the first bws_* call.
     // Reconstruct raw token from parsed parts: 0.{uuid}.{clientSecret}:{encryptionKey}
     const { accessTokenUuid, clientSecret, encryptionKey } = config.sm.parsedToken;
     const rawAccessToken = `0.${accessTokenUuid}.${clientSecret}:${encryptionKey}`;
@@ -160,6 +161,7 @@ export async function buildClients(
       accessToken: rawAccessToken,
       apiUrl: config.sm.apiBase,
       identityUrl: config.sm.identityUrl,
+      timeoutMs: config.httpTimeoutMs,
     });
     if (loaded.ok) smSdk = loaded.client;
     else smSdkError = loaded.error;
@@ -243,12 +245,12 @@ export function buildRegistry(config: Config, clients: Clients): ToolRegistry {
     guard(makeProjectListTool(sdk, orgId));
     guard(makeProjectGetTool(sdk));
     guard(makeProjectCreateTool(sdk, orgId));
-    guard(makeProjectUpdateTool(sdk));
+    guard(makeProjectUpdateTool(sdk, orgId));
     guard(makeProjectDeleteTool(sdk));
     guard(makeSecretListTool(sdk, orgId));
     guard(makeSecretGetValueTool(sdk));
     guard(makeSecretCreateTool(sdk, orgId));
-    guard(makeSecretUpdateTool(sdk));
+    guard(makeSecretUpdateTool(sdk, orgId));
     guard(makeSecretDeleteTool(sdk));
 
     // Machine account and access token tools are stubs (web vault only)

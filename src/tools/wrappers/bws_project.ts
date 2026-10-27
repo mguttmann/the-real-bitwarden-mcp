@@ -90,7 +90,10 @@ export function makeProjectCreateTool(
   };
 }
 
-export function makeProjectUpdateTool(sdk: SmSdkClient | undefined): ToolDef {
+export function makeProjectUpdateTool(
+  sdk: SmSdkClient | undefined,
+  orgId: string | undefined,
+): ToolDef {
   return {
     name: "bws_project_update",
     description: "Rename a Secrets Manager project. Destructive.",
@@ -110,10 +113,8 @@ export function makeProjectUpdateTool(sdk: SmSdkClient | undefined): ToolDef {
       try {
         const id = requireString(input, "id");
         const name = requireString(input, "name");
-        // organizationId is required by SDK update but may come from input
-        const orgId = input.organizationId as string | undefined;
-        if (!orgId) return asToolError(new Error("organizationId required for project update."));
-        const project = await sdk.projectUpdate(orgId, id, name);
+        const org = (input.organizationId as string | undefined) ?? requireOrgId(orgId);
+        const project = await sdk.projectUpdate(org, id, name);
         return jsonResult(project);
       } catch (err) {
         return asToolError(err);
