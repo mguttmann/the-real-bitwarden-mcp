@@ -54,7 +54,7 @@ body:
     attributes:
       label: MCP server version
       description: From `package.json` or `npm ls the-real-bitwarden-mcp`.
-      placeholder: "0.2.0"
+      placeholder: "0.2.1"
     validations:
       required: true
   - type: input

@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-27
+
+Maintenance release. No behaviour change for callers except the
+description and error texts of the machine account and access token
+placeholder tools. Tool names, parameter names and required parameters
+are unchanged (`tests/tool-contract.test.ts`).
+
+### Behaviour changes
+
+- The descriptions and the error text of the placeholder tools
+  `bws_machine_account_list`, `_get`, `_create`, `_update`, `_delete`,
+  `_projects`, `_grant_project`, `_revoke_project` and
+  `bws_access_token_list`, `_create`, `_revoke` now give the real reason:
+  these operations are not available to the credentials this server uses;
+  only a logged-in user in the web vault can manage machine accounts and
+  access tokens. Their schemas are unchanged, so only the description
+  part of a schema fingerprint changes. The tools still return
+  `isError: true` with the web vault link.
+
+### Changed
+
+- ARCHITECTURE.md and README.md state the same reason for these tools
+  (before: "the Public API does not expose them with the required crypto
+  layer").
+
+### Dependencies
+
+- `dotenv` 16.6.1 to 18.0.9. dotenv 18 reads `DOTENV_*` and
+  `DOTENV_CONFIG_*` environment variables as defaults; the
+  working-directory `.env` load now sets every option explicitly, so these
+  variables change nothing (which file loads, override, debug output).
+  Startup with `--env-file` still skips the working-directory `.env`, and
+  nothing is written to stdout.
+- No other runtime or development dependency has a newer release within
+  its major version.
+
+### Added
+
+- CI job `package-smoke` (also run by `release.yml` through `ci.yml`) and
+  `scripts/package-smoke.sh`: packs the tarball, installs it the way the
+  production gateway does (`npm ci --omit=dev --ignore-scripts`), starts
+  it from `node_modules` with `--env-file` and fake credentials on linux
+  x86_64, and fails if `tools/list` differs from the tool contract or the
+  Secrets Manager SDK binary does not load. It is a required check.
+
 ## [0.2.0] - 2026-10-27
 
 Modernization release: MCP SDK v2, Node 22.12 floor, write tools that do
@@ -497,7 +542,8 @@ Correction (added with 0.2.0): the shipped spec
 (`specs/public-api.spec.json`) was empty, so no generated
 `bw_<resource>_<op>_raw` tools were registered.
 
-[Unreleased]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/mguttmann/the-real-bitwarden-mcp/releases/tag/v0.1.1
 [0.1.0]: https://github.com/mguttmann/the-real-bitwarden-mcp/releases/tag/v0.1.0
