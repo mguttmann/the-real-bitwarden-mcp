@@ -1,7 +1,7 @@
 {
   "name": "the-real-bitwarden-mcp",
   "mcpName": "io.github.mguttmann/the-real-bitwarden-mcp",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Unofficial local stdio MCP server for the Bitwarden Public API and Secrets Manager: members, groups, collections, policies, license seats, SM projects and secrets. Not affiliated with Bitwarden Inc.",
   "type": "module",
   "main": "dist/index.js",

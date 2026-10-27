@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-27
+
+New optional tool parameters, limits for response size, input size and
+failed token requests, and Secrets Manager timeout fixes. Tool names,
+parameter names and required lists are unchanged. The tool contract rule
+changes: a release may now add optional parameters (recorded in
+`tests/fixtures/tool-contract-added.json`); no tool, parameter or
+required entry is renamed or removed (`tests/tool-contract.test.ts`).
+
 ### Behaviour changes
 
 - New optional parameters (names, existing parameters and required lists
@@ -37,6 +46,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (self-host, cloud, Secrets Manager REST, Secrets Manager SDK login), new
   token requests pause for 30 s; calls during the pause fail at once with
   `identity backoff: ... retry after N s`. A success resets the count.
+- `BITWARDEN_READ_ONLY` and `BITWARDEN_CONFIRM_WRITES` also accept `on`
+  and `off` (any case). `BITWARDEN_READ_ONLY=off` turned read-only mode on
+  before, and so did a value of only whitespace, which now counts as
+  unset (off). Other unrecognised values still turn read-only mode on.
+- `bws_*` calls: one `HTTP_TIMEOUT_MS` deadline now covers the whole call,
+  including the SDK login and, for `bws_secret_update` without `note` or
+  `projectIds`, the read of the current secret. Before, the login and each
+  SDK call had a deadline of their own, so a call could take two or three
+  times `HTTP_TIMEOUT_MS`.
+- A Secrets Manager SDK login that runs into the deadline keeps running
+  and the next `bws_*` call waits for it instead of starting a second
+  login; a late success is used. The login timeout text says so.
+
+### Added
+
+- `BW_MCP_MAX_RESPONSE_BYTES` (optional): the response budget above.
+- `docs/design/2026-10-0.3.0.md`: the owner decisions for this release.
+- RELEASING.md, "Recovering a release": steps for a failed job after the
+  release exists, a tag pushed while `NPM_PUBLISH_ENABLED` was off, and a
+  half-created release.
 
 ### Changed
 
@@ -47,6 +76,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scripts/package-smoke.sh` share the rule in `scripts/tool-contract.mjs`
   (names and required lists identical, property names a recorded superset
   of the baseline).
+- README states that `truncated: true` after a page that ended exactly at
+  `PAGINATION_MAX_ITEMS` can be followed by an empty page (the API gives
+  no way to tell without another request).
+
+### Fixed
+
+- `mcp-registry.yml` checks out the release tag, also when run by hand,
+  and requires the tag's `server.json` to carry the tag version. A manual
+  run took `server.json` from `main` before, so a newer `main` could list
+  newer descriptions under an older version.
+- The `release.yml` error for an existing release no longer tells users to
+  push a new tag, which RELEASING.md forbids; it points to the recovery
+  steps.
 
 ## [0.2.1] - 2026-10-27
 
@@ -586,7 +628,8 @@ Correction (added with 0.2.0): the shipped spec
 (`specs/public-api.spec.json`) was empty, so no generated
 `bw_<resource>_<op>_raw` tools were registered.
 
-[Unreleased]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/mguttmann/the-real-bitwarden-mcp/releases/tag/v0.1.1
