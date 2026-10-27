@@ -7,6 +7,10 @@ change that fixes it.
 
 ## HTTP, tokens and transport
 
+- [event-skip-token-first-page-end] A `bwmcp-skip` token for the first page carries no upstream token; if the caller omitted `end`, resuming uses a new "now" and can return up to as many already delivered events again as arrived in between. Put the effective `end` into the token or require `start`/`end` for resuming.
+- [event-skip-token-unstable-order] Events with identical timestamps returned in a different order on the repeated page could be duplicated or skipped when resuming inside a page (hypothetical, not reproduced).
+- [pagination-stale-comment] `src/http/pagination.ts` still says a stop inside a page returns no resume point; it now returns `resumeInPage`.
+- [event-token-description-no-limit] The `continuationToken` description of `bw_event_query` does not mention `limit`.
 - [cut-marker-tiny-budget] With a very small `BW_MCP_MAX_RESPONSE_BYTES` (a few hundred bytes) the truncation marker alone is larger than the budget.
 - [cut-token-removed-flag] `continuationTokenRemoved: true` is also set when the cut result had a `null` token (for example member lists); cosmetic.
 - [response-body-read-in-full] Since 0.3.0 successful tool output is cut to `BW_MCP_MAX_RESPONSE_BYTES`, but the upstream body is still read and parsed in full first, so a very large upstream response costs memory before the cut (follow-up of the audit item unbounded-response-buffering).
