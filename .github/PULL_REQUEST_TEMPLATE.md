@@ -2,7 +2,7 @@
 Thanks for the PR. A couple of things first:
 
 - Discuss new features in an issue before writing code.
-- Keep diffs small and focused — one concern per PR.
+- Keep diffs small and focused: one concern per PR.
 - Make sure your commits don't contain real org IDs, emails, or secrets.
 -->
 
@@ -25,11 +25,12 @@ Closes #
 ## Green-bar checklist
 
 - [ ] `npm run build` passes
-- [ ] `npm test` passes (added tests for new behaviour)
+- [ ] `npm test` passes (added tests for new behaviour; a bug fix has a test that failed before)
 - [ ] `npm run typecheck` passes
 - [ ] `npm run lint` passes
 - [ ] `npm run format:check` passes
-- [ ] `CHANGELOG.md` updated under `[Unreleased]` (skip for tooling-only)
+- [ ] `CHANGELOG.md` updated under `[Unreleased]`; caller-visible changes under "Behaviour changes" (skip for tooling-only)
+- [ ] Tool names, parameter names and required parameters unchanged (`npm run test:contract`)
 - [ ] No real organisation IDs, member emails, or secrets in the diff or commit history
 
 ## Notes for the reviewer

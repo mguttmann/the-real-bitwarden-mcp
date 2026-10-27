@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for taking the time to look. This is a small, focused project —
+Thanks for taking the time to look. This is a small, focused project;
 small PRs land fastest.
 
 ## Ground rules
@@ -12,7 +12,7 @@ small PRs land fastest.
   arguments you passed (with secrets redacted), the actual response,
   the expected response, and the Bitwarden product version
   (`/api/version` for self-host).
-- **No proprietary data** — please make sure logs, screenshots, and
+- **No proprietary data**: please make sure logs, screenshots, and
   repros are scrubbed of organisation IDs, member emails, secrets, and
   access tokens before posting.
 
@@ -24,28 +24,40 @@ Requires Node.js >= 22.12.
 git clone https://github.com/mguttmann/the-real-bitwarden-mcp.git
 cd the-real-bitwarden-mcp
 npm ci
-cp .env.example .env   # fill in at least one of: selfhost / cloud / SM
+cp .env.example .env   # fill in self-host and/or cloud; SM lines are optional
 npm run build
 npm test
 ```
 
 ## The green-bar checklist
 
-Every PR must keep all four green:
+Every PR must keep all of these green; CI (`.github/workflows/ci.yml`)
+runs them on Node 22, 24 and 26, plus `npm audit --omit=dev` and a
+gitleaks scan of the full history:
 
 ```bash
 npm run build         # tsc strict, NodeNext ESM
-npm test              # 180+ unit tests with mocked HTTP
-npm run typecheck     # tsc --noEmit against tsconfig.typecheck.json
 npm run lint          # eslint flat config
+npm run typecheck     # tsc --noEmit against tsconfig.typecheck.json (src, tests, scripts)
 npm run format:check  # prettier 3
+npm test              # unit tests with mocked HTTP
+npm run test:contract # tool contract and protocol versions (also part of npm test)
 ```
 
-Optional but appreciated:
+Optional: `npm run test:coverage` (@vitest/coverage-v8 report; no
+threshold is enforced).
 
-```bash
-npm run test:coverage # @vitest/coverage-v8 report (target: ≥ 80 %)
-```
+## The tool contract
+
+Tool names and required parameters are a public contract: gateways
+prefix and pin them. `tests/tool-contract.test.ts` compares `tools/list`
+(names, required lists, property names) with
+`tests/fixtures/tool-contract.json`. Do not rename or remove a tool, do
+not rename a parameter and do not add a required parameter. If a change
+adds a tool or an optional parameter, update the fixture in the same
+change and say so in the changelog. Any change a caller can notice
+(defaults, output shape, errors) goes under "Behaviour changes" in
+`CHANGELOG.md`.
 
 Before a dependency or SDK change, run the container smoke test. It builds
 the tree in `node:24.22.1-bookworm-slim` with `npm ci --no-audit --no-fund
@@ -70,14 +82,20 @@ DOCKER_HOST=unix:///path/to/docker.sock bash scripts/container-smoke.sh
 2. Add a `make<Operation>Tool(client, …)` factory returning a `ToolDef`.
    Read-only operations get `annotations: readOnly` (see
    `wrappers/_helpers.ts`); writes get `annotations: destructive` and
-   are wrapped by `withConfirmGuard` in `src/index.ts`.
+   are wrapped by `withConfirmGuard` in `src/index.ts`. A write that
+   changes existing state should also have a `plan` function, so the
+   confirm preview shows the effective request.
 3. List tools should return a slim projection by default and accept
    `include: ["all"]` to opt in to nested fields. Use the
    `maybeNoteOversize()` helper from `_helpers.ts` to warn (not
    truncate) on oversized payloads.
 4. Register the tool in `src/index.ts → buildRegistry()`.
-5. Write a unit test next to the existing tests for that resource. Use
-   the `mockClient` helper from `tests/test-utils.ts`.
+5. Write a unit test next to the existing tests for that resource
+   (`tests/wrappers/`). `fakeApi()` in `tests/helpers.ts` is a stand-in
+   HTTP client that answers from a route table and records every
+   request; `textOf()` reads the text of a tool result.
+6. Update `tests/fixtures/tool-contract.json` and the tool count asserted
+   in `tests/tool-contract.test.ts` (see "The tool contract").
 
 ## Commit style
 
@@ -86,7 +104,7 @@ Conventional Commits, short and present-tense:
 - `feat: add bw_member_freeze tool`
 - `fix(http): retry 502 on token refresh`
 - `docs: clarify confirm-gate behaviour`
-- `chore(deps): bump vitest to 4.1.8`
+- `chore(deps): bump vitest to 5.0.5`
 
 Squash before merging.
 
@@ -95,7 +113,12 @@ Squash before merging.
 Set by Prettier (`.prettierrc.json`) and ESLint (`eslint.config.js`).
 Run `npm run format && npm run lint:fix` before pushing.
 
+## Releases
+
+See [RELEASING.md](RELEASING.md). Releases are built by the tag-triggered
+release workflow, not by hand.
+
 ## Security issues
 
-**Do not open public issues for security findings.** See
-[SECURITY.md](SECURITY.md) for the private disclosure channel.
+**Do not put details of security findings into public issues.** See
+[SECURITY.md](SECURITY.md) for how to report them.

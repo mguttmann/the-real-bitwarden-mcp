@@ -7,7 +7,7 @@ body:
       value: |
         Thanks for the report. **Please make sure your repro is scrubbed of
         organisation IDs, member emails, secrets, and access tokens** before
-        you post — this is a public issue tracker.
+        you post; this is a public issue tracker.
 
         For security vulnerabilities, see [SECURITY.md](../blob/main/SECURITY.md)
         instead; do not file public issues for those.
@@ -54,14 +54,14 @@ body:
     attributes:
       label: MCP server version
       description: From `package.json` or `npm ls the-real-bitwarden-mcp`.
-      placeholder: "0.1.0"
+      placeholder: "0.2.0"
     validations:
       required: true
   - type: input
     id: node-version
     attributes:
       label: Node.js version
-      placeholder: "20.18.0"
+      placeholder: "24.22.1"
     validations:
       required: true
   - type: textarea

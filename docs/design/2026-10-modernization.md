@@ -65,6 +65,12 @@ in logs or tool error texts, and a reproducible, verifiable release chain.
    (`assertSafePath` for raw paths, `pathId` for ids).
 9. **Release chain like action1-mcp**: tag-triggered workflow, CI gate, npm
    publish with provenance, SBOM, `SHA256SUMS`, GitHub attestations.
+   Outcome (stage D): `.github/workflows/release.yml` calls `ci.yml` on the
+   tag commit, builds the assets with `scripts/release-assets.sh` (clean
+   build, `npm pack`, CycloneDX SBOM via `npm sbom`, `SHA256SUMS`), attests
+   them and creates the GitHub release; `npm publish --provenance` runs
+   only when the owner has set `NPM_PUBLISH_ENABLED` and configured trusted
+   publishing (`RELEASING.md`). Not run yet.
 10. **No new required environment variables.**
 
 ## Out of scope

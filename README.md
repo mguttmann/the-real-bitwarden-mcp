@@ -4,37 +4,46 @@
 [![Node.js](https://img.shields.io/node/v/the-real-bitwarden-mcp.svg)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue.svg)](tsconfig.json)
-[![Tests](https://img.shields.io/badge/tests-180%20passing-success.svg)](#testing)
+[![CI](https://github.com/mguttmann/the-real-bitwarden-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/mguttmann/the-real-bitwarden-mcp/actions/workflows/ci.yml)
 
 A local [Model Context Protocol](https://modelcontextprotocol.io) (stdio)
 server that exposes Bitwarden's Public API (organization management) and
 the Bitwarden Secrets Manager (projects + secrets via the official
-SDK) as typed tools — read and write.
+SDK) as typed tools, read and write.
 
 Intended use: an admin-facing MCP that lets an AI assistant manage
 members, groups, collections, policies, license seats, and Secrets-Manager
 data from a single host. Designed for a self-hosted Bitwarden instance,
 the official Bitwarden Cloud, or both.
 
-> **Quick links:** [Architecture](ARCHITECTURE.md) ·
-> [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) ·
-> [Changelog](CHANGELOG.md) · [Issues](https://github.com/mguttmann/the-real-bitwarden-mcp/issues)
+**Quick links:** [Architecture](ARCHITECTURE.md) ·
+[Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) ·
+[Releasing](RELEASING.md) · [Changelog](CHANGELOG.md) ·
+[Issues](https://github.com/mguttmann/the-real-bitwarden-mcp/issues)
 
 ## Features
 
 - **Public API:** members, groups, collections, policies, events, organization
   import, subscription/licensing.
 - **Secrets Manager:** projects and secrets via the official `@bitwarden/sdk-napi`
-  (Zero-Knowledge crypto — cleartext names and values returned directly).
+  (Zero-Knowledge crypto; cleartext names and values returned directly).
 - **Dual-instance aware:** runs against a self-hosted Bitwarden instance, the
   official cloud, or both. Tools are wired to their instance at registration
   time so routing mistakes are impossible by accident.
-- **Two-layer tool surface:** ~50 hand-written wrappers for common flows
-  (`bw_member_list`, `bw_license_subscription_get`, `bws_secret_get_value`, …)
-  plus a generated `bw_<resource>_<op>_raw` tool for every Public API
-  operation, derived from the live Swagger document of your instance.
-- **Confirm-gated writes:** every destructive tool returns a request preview
-  unless invoked with `confirm: "YES"`. Default is on.
+- **Hand-written tools** for common flows (`bw_member_list`,
+  `bw_license_subscription_get`, `bws_secret_get_value`, ...) plus the
+  `bw_raw_request` escape hatch. With self-host and cloud configured the
+  server lists 54 tools, with or without Secrets Manager; this list
+  (names, required parameters, property names) is pinned by
+  `tests/tool-contract.test.ts`.
+- **No generated tools in the shipped package:** the generator for
+  `bw_<resource>_<op>_raw` tools exists (`npm run generate`), but the
+  shipped spec (`specs/public-api.spec.json`) is empty, so 0 generated
+  tools are registered. See [Generated raw tools](#generated-raw-tools).
+- **Confirm-gated writes:** every write tool returns a request preview
+  unless invoked with `confirm: "YES"`. Default is on. The model sets
+  `confirm` itself, so this is friction, not a security boundary (see
+  [Safety model](#safety-model)).
 - **Secret-safe by design:** the metadata list never returns values; access
   tokens are managed in the web vault only.
 - **Token-budget-aware list defaults:** list tools (`bw_member_list`,
@@ -50,7 +59,7 @@ requirements. This MCP wraps everything that's _cleanly_ reachable. Some
 operations require Bitwarden's encryption layer (so we use the official
 SDK); others have no public API at all and need the web vault.
 
-### Can — Public API (Organization & Members)
+### Can: Public API (organization and members)
 
 Uses the Organization Public-API key (`organization.<uuid>` /
 client_credentials / scope `api.organization`).
@@ -69,7 +78,7 @@ client_credentials / scope `api.organization`).
   delta, send current + delta as the new total and read it back
 - Cloud-only: license inspection on the cloud organization
 
-### Can — Secrets Manager (via the official Bitwarden SDK)
+### Can: Secrets Manager (via the official Bitwarden SDK)
 
 Uses the Machine-Account access token (`BWS_ACCESS_TOKEN`), exchanged
 through `@bitwarden/sdk-napi` which handles Bitwarden's Zero-Knowledge
@@ -79,7 +88,7 @@ encryption.
 - List secret metadata, fetch full secret incl. cleartext value, create,
   update, delete secrets
 
-### Cannot — these need a human in the web vault
+### Cannot: these need a human in the web vault
 
 Bitwarden's APIs do not expose these. The SDK doesn't either.
 
@@ -88,7 +97,7 @@ Bitwarden's APIs do not expose these. The SDK doesn't either.
 - Create or rotate Machine Account Access Tokens
 - List all Machine Accounts in the organization (Machine Accounts cannot
   enumerate each other; security model)
-- Trigger a Cloud → Self-Host license re-sync
+- Trigger a cloud to self-host license re-sync
 - **Read, grant or revoke** a member's Secrets Manager access. Bitwarden's
   Public API neither returns nor applies `accessSecretsManager`;
   `bw_member_grant_sm` / `bw_member_revoke_sm` stay registered but always
@@ -102,24 +111,26 @@ For all of these: use the web vault at `https://<your-host>/#/sm/{orgId}/`.
 
 ## Requirements
 
-- Node ≥ 22.12.
+- Node.js 22.12 or newer (`engines.node` `>=22.12`; CI tests 22, 24 and 26).
 - A Bitwarden Public-API key (`client_id` / `client_secret`) for at least one
   instance (self-host or cloud).
 - For Secrets Manager: a Machine-Account access token (from the web vault).
 
 ## Platform support
 
-This MCP works on any Node ≥ 22.12 platform for **all Public API features**
-(members, groups, collections, policies, events, license adjustments,
-member SM-grant/revoke).
+This MCP works on any platform with Node.js 22.12 or newer for **all
+Public API features** (members, groups, collections, policies, events,
+license adjustments).
 
 The **Secrets Manager features** (`bws_project_*`, `bws_secret_*`) depend
-on `@bitwarden/sdk-napi`, which ships native Rust binaries through optional
-dependencies. Supported platforms:
+on `@bitwarden/sdk-napi` (1.0.0, an optional dependency, not MIT licensed),
+which ships native Rust binaries as optional per-platform packages. The
+lockfile contains `@bitwarden/sdk-napi-darwin-arm64`, `-darwin-x64`,
+`-linux-x64-gnu` and `-win32-x64-msvc`:
 
 | OS / Arch                                | SDK binary    | SM tools  |
 | ---------------------------------------- | ------------- | --------- |
-| macOS Apple Silicon (M1/M2/M3)           | available     | available |
+| macOS Apple Silicon                      | available     | available |
 | macOS Intel                              | available     | available |
 | Linux x86_64 (glibc)                     | available     | available |
 | Windows x86_64                           | available     | available |
@@ -128,54 +139,71 @@ dependencies. Supported platforms:
 | Other                                    | not available | stubbed   |
 
 On unsupported platforms the MCP still starts and all Public-API tools
-work normally. The `bws_project_*` and `bws_secret_*` tools return
-"Secrets Manager SDK not available on this platform" at call time.
+work normally. The `bws_project_*` and `bws_secret_*` tools stay
+registered and return "Secrets Manager SDK not available on this
+platform" at call time; the load error is logged once at startup as a
+`warn` line.
 
-If Bitwarden ships SDK binaries for a new platform, simply `npm install`
-will pick them up — no MCP code change needed.
+If Bitwarden releases an SDK version with binaries for a new platform,
+updating the dependency and the lockfile picks it up; no code change is
+needed.
 
 ## Setup
 
 ```bash
 git clone <repo-url>
 cd <repo>
-npm install          # also pulls the platform-specific SDK binary automatically
+npm ci               # also pulls the platform-specific SDK binary
 cp .env.example .env
-# Fill in .env — see "Configuration".
-npm run refresh-spec      # pull Swagger from your self-host (optional)
-npm run generate          # build the generated tool list (optional)
+# Fill in .env, see "Configuration".
 npm run build
 ```
 
-The SDK binary is an optional dependency — `npm install` succeeds even on
-unsupported platforms (the binary simply won't be present, and SM tools will
+The SDK binary is an optional dependency: `npm ci` succeeds even on
+unsupported platforms (the binary is simply not present, and SM tools
 return a clear "not available" message).
+
+### Generated raw tools
+
+`npm run refresh-spec` pulls the Swagger document of your self-host
+instance into `specs/public-api.spec.json`, and `npm run generate` builds
+one `bw_<resource>_<op>_raw` tool per operation from it. The shipped spec
+is empty (`{"paths": {}}`), so a normal build registers 0 generated tools.
+Generating tools changes the tool list; if the server runs behind a
+gateway that pins the tool surface, treat that as a deploy change.
 
 ## Configuration
 
-All values are read from `.env`. **At least one instance must be fully
-configured**, otherwise the server refuses to start.
+All values are environment variables. They come from the process
+environment (for example `node --env-file=.env`, or the `env` block of an
+MCP client config), and in addition from a `.env` file in the **process
+working directory**, which only fills variables that are not already set.
+**At least one instance must be fully configured**, otherwise the server
+refuses to start. A partially configured instance (some but not all four
+variables) is also fatal. URLs are not validated at startup; a wrong URL
+fails at the first call. Invalid values of the optional numeric and
+boolean variables fall back to the default.
 
-| Variable                           | Required when                 | Purpose                                                                       |
-| ---------------------------------- | ----------------------------- | ----------------------------------------------------------------------------- |
-| `BITWARDEN_SELFHOST_API_BASE`      | self-host mode                | `https://vault.example.com/api`                                               |
-| `BITWARDEN_SELFHOST_IDENTITY_URL`  | self-host mode                | `https://vault.example.com/identity`                                          |
-| `BITWARDEN_SELFHOST_CLIENT_ID`     | self-host mode                | Public-API client id (`organization.{orgId}`)                                 |
-| `BITWARDEN_SELFHOST_CLIENT_SECRET` | self-host mode                | Public-API client secret                                                      |
-| `BITWARDEN_CLOUD_API_BASE`         | cloud mode                    | `https://api.bitwarden.com`                                                   |
-| `BITWARDEN_CLOUD_IDENTITY_URL`     | cloud mode                    | `https://identity.bitwarden.com`                                              |
-| `BITWARDEN_CLOUD_CLIENT_ID`        | cloud mode                    | Public-API client id (cloud)                                                  |
-| `BITWARDEN_CLOUD_CLIENT_SECRET`    | cloud mode                    | Public-API client secret (cloud)                                              |
-| `BWS_ACCESS_TOKEN`                 | SM tools                      | Machine-account access token (3-part format — see below)                      |
-| `BWS_API_BASE`                     | SM tools (optional)           | Defaults to selfhost API base                                                 |
-| `BWS_IDENTITY_URL`                 | SM tools (optional)           | Defaults to selfhost identity URL                                             |
-| `BWS_ORG_ID`                       | SM project/secret create/list | Organization UUID                                                             |
-| `BITWARDEN_CONFIRM_WRITES`         |                               | `true` (default) returns previews for destructive tools                       |
-| `LOG_LEVEL`                        |                               | `debug` \| `info` \| `warn` (default) \| `error`                              |
-| `HTTP_TIMEOUT_MS`                  |                               | default 30000; applies to API and OAuth token requests                        |
-| `PAGINATION_MAX_ITEMS`             |                               | default 1000                                                                  |
-| `PAGINATION_MAX_PAGES`             |                               | default 20                                                                    |
-| `BW_MCP_MAX_LIST_RESPONSE_BYTES`   |                               | default 60000 — adds a `note` warning to list responses that exceed this size |
+| Variable                           | Required when                 | Purpose                                                                      |
+| ---------------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `BITWARDEN_SELFHOST_API_BASE`      | self-host mode                | `https://vault.example.com/api`                                              |
+| `BITWARDEN_SELFHOST_IDENTITY_URL`  | self-host mode                | `https://vault.example.com/identity`                                         |
+| `BITWARDEN_SELFHOST_CLIENT_ID`     | self-host mode                | Public-API client id (`organization.{orgId}`)                                |
+| `BITWARDEN_SELFHOST_CLIENT_SECRET` | self-host mode                | Public-API client secret                                                     |
+| `BITWARDEN_CLOUD_API_BASE`         | cloud mode                    | `https://api.bitwarden.com`                                                  |
+| `BITWARDEN_CLOUD_IDENTITY_URL`     | cloud mode                    | `https://identity.bitwarden.com`                                             |
+| `BITWARDEN_CLOUD_CLIENT_ID`        | cloud mode                    | Public-API client id (cloud)                                                 |
+| `BITWARDEN_CLOUD_CLIENT_SECRET`    | cloud mode                    | Public-API client secret (cloud)                                             |
+| `BWS_ACCESS_TOKEN`                 | SM tools                      | Machine-account access token (3-part format, see below); malformed is fatal  |
+| `BWS_API_BASE`                     | SM tools (optional)           | Defaults to selfhost API base                                                |
+| `BWS_IDENTITY_URL`                 | SM tools (optional)           | Defaults to selfhost identity URL                                            |
+| `BWS_ORG_ID`                       | SM project/secret create/list | Organization UUID, used when `organizationId` is not passed                  |
+| `BITWARDEN_CONFIRM_WRITES`         |                               | default `true`: write tools return a preview unless `confirm: "YES"`         |
+| `LOG_LEVEL`                        |                               | `debug` \| `info` \| `warn` (default) \| `error`                             |
+| `HTTP_TIMEOUT_MS`                  |                               | default 30000; applies to API and OAuth token requests                       |
+| `PAGINATION_MAX_ITEMS`             |                               | default 1000                                                                 |
+| `PAGINATION_MAX_PAGES`             |                               | default 20                                                                   |
+| `BW_MCP_MAX_LIST_RESPONSE_BYTES`   |                               | default 60000; adds a `note` warning to list responses that exceed this size |
 
 ### Mode matrix
 
@@ -188,15 +216,15 @@ configured**, otherwise the server refuses to start.
 
 ### Getting a Secrets Manager access token
 
-1. In the self-host vault → **Secrets Manager → Machine accounts** → create
-   one (a neutral name like `mcp-bitwarden` works).
+1. In the self-host vault, open **Secrets Manager > Machine accounts** and
+   create one (a neutral name like `mcp-bitwarden` works).
 2. Grant the machine account access to the projects you want the MCP to
    manage.
 3. Create an **access token** for the machine account and copy the cleartext
    value into `.env` as `BWS_ACCESS_TOKEN`.
 4. Also set `BWS_ORG_ID` to the organization UUID (from the URL of the
    organization in the web vault).
-5. Restart the MCP — the `bws_*` tools become operational.
+5. Restart the MCP; the `bws_*` tools become operational.
 
 Until then, the SM tools stay registered but return _"Secrets Manager not
 configured"_ so the surface remains discoverable.
@@ -218,22 +246,22 @@ Example (all values fictional):
 The MCP passes this token directly to the Bitwarden SDK, which handles
 all credential parsing and crypto internally.
 
-| Part                   | Value                 | Used by                                                        |
-| ---------------------- | --------------------- | -------------------------------------------------------------- |
-| Segment 1              | `0`                   | Version prefix                                                 |
-| Segment 2              | `{ACCESS_TOKEN_UUID}` | SDK → OAuth `client_id`                                        |
-| Segment 3 (before `:`) | `{CLIENT_SECRET}`     | SDK → OAuth `client_secret`                                    |
-| After `:`              | `{ENCRYPTION_KEY}`    | SDK → decrypts response payload. **Never sent to the server.** |
+| Part                   | Value                 | Used by                                                  |
+| ---------------------- | --------------------- | -------------------------------------------------------- |
+| Segment 1              | `0`                   | Version prefix                                           |
+| Segment 2              | `{ACCESS_TOKEN_UUID}` | SDK, as OAuth `client_id`                                |
+| Segment 3 (before `:`) | `{CLIENT_SECRET}`     | SDK, as OAuth `client_secret`                            |
+| After `:`              | `{ENCRYPTION_KEY}`    | SDK, decrypts the payload. **Never sent to the server.** |
 
 The OAuth request to the identity server uses `scope=api.secrets` (not
 `api.organization`). The Org Public-API key (`organization.*` client_id with
-`api.organization` scope) **cannot** access Secrets Manager endpoints — this
+`api.organization` scope) **cannot** access Secrets Manager endpoints; this
 is by design, not a bug.
 
 ### Self-hosted Bitwarden: Secrets Manager availability
 
 Current self-hosted Bitwarden (server 2026.x) bundles the Secrets Manager API
-**inside the standard `bitwarden-api` container** — there is no separate
+**inside the standard `bitwarden-api` container**; there is no separate
 `sm-api` container and no `enable_secrets_manager` toggle in
 `bwdata/config.yml`. If your `docker-compose.yml` does not show an `sm-api`
 service, that is correct and expected.
@@ -246,8 +274,8 @@ valid access token in the web vault.
 The four list tools (`bw_member_list`, `bw_collection_list`, `bw_group_list`,
 `bw_event_query`) return **slim projections by default** because Bitwarden's
 Public API embeds the full permission graph in every list item, which inflates
-the response by a factor of 5–10× and overruns LLM tool-call token budgets at
-modest org sizes (live observed: 81 KB on ~200 members).
+the response several times over and overruns LLM tool-call token budgets at
+modest organization sizes.
 
 Default fields:
 
@@ -272,14 +300,15 @@ For per-item details, use the dedicated detail endpoints
 
 A response-size guard adds a `note` field to any list response that exceeds
 `BW_MCP_MAX_LIST_RESPONSE_BYTES` (default 60 000 chars). The response is
-still returned in full — nothing is truncated silently.
+still returned in full; nothing is truncated silently.
 
 ## Running
 
 ```bash
 npm start              # production: dist/index.js (stdio)
 npm run dev            # development: tsx src/index.ts (stdio)
-npm test               # unit tests
+npm test               # unit tests with mocked HTTP
+npm run test:contract  # tool contract and protocol versions only
 npm run test:live      # opt-in live smoke tests (read-only, RUN_LIVE_TESTS=1)
 npm run inspector      # open the MCP Inspector against the built bundle
 ```
@@ -296,31 +325,64 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`
   "mcpServers": {
     "bitwarden": {
       "command": "node",
-      "args": ["/absolute/path/to/the-real-bitwarden-mcp/dist/index.js"]
+      "args": [
+        "--env-file=/absolute/path/to/the-real-bitwarden-mcp/.env",
+        "/absolute/path/to/the-real-bitwarden-mcp/dist/index.js"
+      ]
     }
   }
 }
 ```
 
+Instead of `--env-file`, the variables can also go into an `env` object
+next to `args`. Without either, the server only finds a `.env` in the
+working directory the client starts it in, which usually is not the
+repository, and exits with "No Bitwarden instance configured".
+
 ### Claude Code
 
-Add the same JSON block to your project's MCP config (typically
-`.claude/config.json` at the project root, or the user-level
-`~/.claude/config.json`).
+Register the server with `claude mcp add` (user or project scope), or add
+the same `mcpServers` block to a `.mcp.json` file at the project root:
 
-### Environment
+```bash
+claude mcp add bitwarden -- node --env-file=/absolute/path/to/.env /absolute/path/to/dist/index.js
+```
 
-The server reads `.env` from the **process working directory**. If your
-host launches the binary from a different directory, set the env vars
-in the connector's `env` field directly, or wrap with a launcher that
-`cd`s first.
+### Gateway and headless use
+
+The server speaks MCP over stdio only and needs no terminal. A gateway or
+supervisor starts it like this:
+
+```bash
+npm ci --no-audit --no-fund && npm run build
+node --env-file=/path/to/.env /path/to/dist/index.js
+```
+
+- **Logs** are JSON lines on stderr (pino, level `LOG_LEVEL`); stdout
+  carries only the MCP stream.
+- **Protocol revisions:** clients that open with `initialize` for
+  2025-06-18 or 2025-11-25 get that revision; clients that open with the
+  2026-07-28 revision (`server/discover`) are served at 2026-07-28. Pinned
+  by `tests/protocol-versions.test.ts`.
+- **Message size limit:** the MCP SDK's stdio transport accepts incoming
+  lines (one JSON-RPC message each) of at most 10 MiB. A larger line
+  closes the transport and the process exits; the client has to start it
+  again.
+- **Tool names are stable.** Tool names and required parameters do not
+  change within a minor release; changes that a caller can notice are
+  listed under "Behaviour changes" in the [changelog](CHANGELOG.md).
+  `scripts/container-smoke.sh` builds and probes the server the way a
+  gateway does (see CONTRIBUTING).
+- **No user separation:** every caller acts with the full rights of the
+  configured keys. Restrict which tools each user may call in the
+  gateway (see [SECURITY.md](SECURITY.md#threat-model)).
 
 ## Tool reference
 
 Run `bw_help` from inside the MCP to get a grouped, always-current catalogue.
 A short list:
 
-### Public API — operational (self-host, hand-written)
+### Public API: operational (self-host)
 
 - `bw_member_list`, `bw_member_get`, `bw_member_invite`, `bw_member_update`,
   `bw_member_remove`, `bw_member_reinvite`, `bw_member_get_groups`,
@@ -334,11 +396,12 @@ A short list:
 - `bw_event_query`
 - `bw_org_import`
 
-### Public API — generated raw tools (self-host)
+### Public API: generated raw tools (self-host)
 
-- `bw_<resource>_<op>_raw` — one tool per Public-API operation. See
-  `src/tools/generated/snapshot.json` for the exact set produced from the
-  current spec.
+None in the shipped package (the spec is empty, see
+[Generated raw tools](#generated-raw-tools)).
+`src/tools/generated/snapshot.json` lists the set produced from the
+current spec.
 
 ### License / subscription (cloud)
 
@@ -353,14 +416,19 @@ All four take a delta, send current + delta as the new absolute total through
 `PUT /public/organization/subscription`, read the subscription back and return
 an error if the total did not change.
 
-### Secrets Manager — SDK-backed (require `BWS_ACCESS_TOKEN` + supported platform)
+### Secrets Manager: SDK-backed (require `BWS_ACCESS_TOKEN` and a supported platform)
 
 - Projects: `bws_project_list`, `bws_project_get`, `bws_project_create`,
   `bws_project_update`, `bws_project_delete`
 - Secrets: `bws_secret_list` (identifiers only), `bws_secret_get_value`,
   `bws_secret_create`, `bws_secret_update`, `bws_secret_delete`
 
-### Secrets Manager — web vault only (always stubbed)
+`bws_project_update` and `bws_secret_update` need `organizationId` in the
+call; they do not fall back to `BWS_ORG_ID`. `bws_secret_update` replaces
+the whole secret: an omitted `note` becomes empty and omitted
+`projectIds` detach the secret from its projects.
+
+### Secrets Manager: web vault only (always stubbed)
 
 - Machine accounts: `bws_machine_account_list`, `..._get`, `..._create`,
   `..._update`, `..._delete`, `..._projects`, `..._grant_project`,
@@ -373,17 +441,22 @@ them always returns `isError: true` with a link to the web vault. Use
 
 ### Universal
 
-- `bw_raw_request` — escape hatch with `instance` parameter (`selfhost`, `cloud`, or `sm`).
+- `bw_raw_request`: escape hatch with `instance` parameter (`selfhost`, `cloud`, or `sm`).
   Use this for any Public API or SM REST call not covered by the hand-written tools.
-  Note: SM `bws_*` CRUD goes through the SDK (not raw REST) — raw_request with
+  Note: SM `bws_*` CRUD goes through the SDK (not raw REST); raw_request with
   `instance: "sm"` still works for read operations but cannot create/update projects
   or secrets because the API requires encrypted names/values.
-- `bw_help` — grouped catalogue of registered tools.
+- `bw_help`: grouped catalogue of registered tools.
 
 ## Safety model
 
-- `BITWARDEN_CONFIRM_WRITES=true` (default): destructive tools return a
-  preview unless invoked with `confirm: "YES"`.
+- `BITWARDEN_CONFIRM_WRITES=true` (default): write tools return a
+  preview unless invoked with `confirm: "YES"`. **This is a
+  self-confirmation by the model, not a security boundary:** the model
+  decides to send `confirm: "YES"`, also on the first call, and text in
+  Bitwarden data can steer it. Read-only tools, including
+  `bws_secret_get_value`, are never gated. Limit what the configured keys
+  and the machine account may do, and which tools each user may call.
 - The `bws_secret_list` tool returns secret identifiers only (no value field).
   Cleartext values are only returned through `bws_secret_get_value(id)`, one
   secret at a time: `bws_secret_create` / `bws_secret_update` return the
@@ -431,9 +504,13 @@ curl -sS "https://vault.example.com/api/organizations/{ORG_ID}/projects" \
 
 ### `bws_*` tools return "SDK not available on this platform"
 
-The `@bitwarden/sdk-napi` native binary is not available for the current
-platform. See the Platform support table above for the list of supported
-combinations. The MCP logs the load error to stderr at startup (a `warn` log line).
+Either the `@bitwarden/sdk-napi` native binary is not available for the
+current platform (see the Platform support table above), or the SDK loaded
+but its login with `BWS_ACCESS_TOKEN` failed at startup (wrong token,
+identity server unreachable). Both give the same tool error. The startup
+`warn` log line on stderr tells them apart: `smSdk.kind` is
+`module_not_found` or `binary_not_available` for the platform case and
+`init_failed` for a failed login.
 
 On unsupported platforms, all Public-API tools (`bw_*`) continue to work
 normally. Only the `bws_project_*` and `bws_secret_*` tools are affected.

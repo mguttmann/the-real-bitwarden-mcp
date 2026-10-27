@@ -1,0 +1,35 @@
+# Weekly dependency updates, grouped so each ecosystem opens few pull
+# requests per week. Security updates are not delayed by the cooldown.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 5
+    open-pull-requests-limit: 5
+    groups:
+      npm-runtime:
+        dependency-type: production
+        update-types: [minor, patch]
+      npm-dev:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # @types/node follows the oldest supported Node line, 22
+      # (engines >=22.12).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 5
+    groups:
+      github-actions:
+        patterns: ["*"]

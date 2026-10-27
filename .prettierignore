@@ -5,3 +5,4 @@ src/tools/generated/
 specs/public-api.spec.json
 package-lock.json
 docs/audit/
+release/

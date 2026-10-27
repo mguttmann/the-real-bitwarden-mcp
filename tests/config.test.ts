@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { parseEnv } from "node:util";
 import { describe, it, expect } from "vitest";
 import { loadConfig, parseBwsToken } from "../src/config.js";
 
@@ -129,5 +131,22 @@ describe("parseBwsToken", () => {
     // Verify encryptionKey is separate and not mixed into clientSecret
     expect(parsed.clientSecret).not.toContain("CCCCCCCCCCCCCCCCCCCCCC==");
     expect(parsed.clientSecret).toBe("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB");
+  });
+});
+
+describe(".env.example", () => {
+  it("copied unedited, starts with both instances and SM not configured", () => {
+    const env = parseEnv(readFileSync(new URL("../.env.example", import.meta.url), "utf8"));
+    const cfg = loadConfig(env);
+    expect(cfg.selfhost).toBeDefined();
+    expect(cfg.cloud).toBeDefined();
+    expect(cfg.sm).toBeUndefined();
+  });
+
+  it("lists every variable that loadConfig reads", () => {
+    const text = readFileSync(new URL("../.env.example", import.meta.url), "utf8");
+    const source = readFileSync(new URL("../src/config.ts", import.meta.url), "utf8");
+    const read = [...source.matchAll(/env\.([A-Z][A-Z0-9_]+)/g)].map((m) => m[1]);
+    for (const name of new Set(read)) expect(text).toMatch(new RegExp(`^#? ?${name}=`, "m"));
   });
 });

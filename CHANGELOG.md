@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-27
+
+Modernization release: MCP SDK v2, Node 22.12 floor, write tools that do
+what they say, one secret scrubber for logs and error texts, and a
+release chain with provenance. Tool names, parameter names and required
+parameters are unchanged (pinned by `tests/tool-contract.test.ts`).
+
+### Breaking
+
+- **Node.js 22.12 or newer is required** (see the first behaviour change).
+- **Write tools that could not work now return errors instead of false
+  successes**: `bw_member_grant_sm`, `bw_member_revoke_sm`,
+  `bw_member_invite` with `accessSecretsManager: true`,
+  `bw_group_create` / `bw_group_update` with `accessAll: true`,
+  `bw_collection_update` with a non-empty `users` list, `bw_event_query`
+  with `ipAddress` or with `actingUserId` and `itemId` together.
+- **The four `bw_license_*_update` tools now really change the
+  subscription** (before they were no-ops reported as success).
+- **`bws_secret_create` / `bws_secret_update` no longer return the
+  secret value.**
+
 ### Behaviour changes
 
 - **Node.js 22.12 or newer is required** (`engines.node` `>=22.12`, was
@@ -14,9 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   needs 22.12.
 - **MCP SDK v2** (`@modelcontextprotocol/server` 2.x replaces
   `@modelcontextprotocol/sdk` 1.x). The server keeps the low-level `Server`
-  and the hand-written JSON Schemas, so `tools/list` is unchanged: same
-  tool names, required lists, properties and schemas
-  (`tests/fixtures/tool-contract.json`). Stdio is now served through
+  and the hand-written JSON Schemas, so the SDK change alone leaves
+  `tools/list` as it was. Across this release tool names, required lists
+  and property names are unchanged (`tests/fixtures/tool-contract.json`);
+  some descriptions changed and the misleading `default` entries of the
+  update tools were removed (see below). Stdio is now served through
   `serveStdio(..., { legacy: "serve" })`:
   - clients that send `initialize` with 2025-06-18 or 2025-11-25 get the
     same revision back, as before;
@@ -34,7 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check compared the file name of `argv[1]`, so a start through the bin
   symlink exited with code 0 without doing anything. Starting
   `node dist/index.js` directly is unaffected.
-
 - **`bw_member_update` keeps state for omitted fields.** Before, leaving out
   `groups`, `collections` or `externalId` sent `[]` / `null` and removed the
   member from all groups, all direct collection access and the external id;
@@ -122,14 +144,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Redirects are not followed.** API and OAuth token requests use
   `redirect: "manual"`; a 3xx answer is an error (`BitwardenApiError`
   code `redirect_not_followed`, or `OAuth token request failed: <status>
-(redirect not followed)`). Before, fetch followed redirects and a
-  307/308 re-sent the request body (for the token request: the
-  `client_secret`) to the new location.
+(redirect not followed)`). Before, fetch followed redirects, including
+  ones that re-send the request body.
 - **Dot segments and encoded separators are rejected.** `bw_raw_request`
   returns an error for paths with `.` or `..` segments (also
   percent-encoded, `%2e` in any case) or `%2F` / `%5C`; before they were
-  normalised and could leave the API base prefix (for example
-  `/../identity/...`). Ids put into wrapper paths (`bw_member_*`,
+  normalised and could leave the API base prefix. Ids put into wrapper paths (`bw_member_*`,
   `bw_group_*`, `bw_collection_*`) are rejected when they are `.` / `..`
   (also encoded) or contain `/`, `\`, `%2F` or `%5C`.
 - **`HTTP_TIMEOUT_MS` now also bounds the OAuth token request** (before it
@@ -140,21 +160,8 @@ out after <ms> ms`.
 - **An `access_token` that is not a valid header value** (anything but
   visible ASCII) is rejected with a static error at token time, instead of
   failing later with an undici error that quoted the token.
-
-### Changed
-
-- Dependencies: `pino` 10, `@types/node` 22, `vitest` and
-  `@vitest/coverage-v8` 5, `eslint` 10 (with `@eslint/js` as a direct dev
-  dependency), `eslint-config-prettier` 10, current `typescript-eslint`,
-  `prettier`, `tsx`, TypeScript 5.9. `zod` comes in through the SDK only
-  (no direct dependency; `src/` does not use it). `dotenv` stays on 16.
-  `package-lock.json` is generated with the npm of
-  `node:24.22.1-bookworm-slim`; `npm audit` and `npm audit --omit=dev`
-  report 0 vulnerabilities.
-- CI tests Node 22, 24 and 26 (was 20 and 22).
-- `npm run typecheck` now really covers `tests/` and `scripts/` (the
-  inherited `exclude` had dropped them); the type errors this surfaced in
-  tests are fixed.
+- **Retry-After** values that are invalid or in the past fall back to the
+  normal backoff.
 
 ### Added
 
@@ -166,37 +173,124 @@ out after <ms> ms`.
 - `scripts/stdio-probe.mjs` and `scripts/container-smoke.sh`: build in
   the gateway image and probe `dist/index.js` over stdio without network
   (see CONTRIBUTING).
+- Release chain: `.github/workflows/release.yml` (tag `v*`: CI gate,
+  clean build, npm tarball, CycloneDX SBOM, `SHA256SUMS`, build
+  provenance attestation, GitHub release; npm publish with provenance
+  through trusted publishing once the owner enables it),
+  `scripts/release-assets.sh`, `RELEASING.md`.
+- CI: `npm audit --omit=dev --audit-level=low`, a gitleaks scan of the
+  full history (pinned version, verified checksum), a weekly scheduled
+  run and a named tool-contract step (`npm run test:contract`).
+- `.github/dependabot.yml`: weekly grouped npm and GitHub Actions
+  updates.
+- Docs: gateway and headless use, the 10 MiB stdio line limit, the
+  security model (the confirm gate is a self-confirmation by the model,
+  not a security boundary), `CLAUDE.md` for contributors using Claude
+  Code, `docs/BACKLOG.md` (known minor issues).
+
+### Changed
+
+- CI tests Node 22, 24 and 26 (was 20 and 22); actions are pinned by
+  commit SHA; workflows default to `permissions: contents: read`.
+- `npm run typecheck` now really covers `tests/` and `scripts/` (the
+  inherited `exclude` had dropped them); the type errors this surfaced in
+  tests are fixed.
+- `.env.example`: the Secrets Manager lines are commented out (a copied,
+  unedited file used to make startup fatal) and
+  `BW_MCP_MAX_LIST_RESPONSE_BYTES` is listed.
+- README, ARCHITECTURE, SECURITY and CONTRIBUTING corrected against the
+  code: generated raw tools (the shipped spec is empty, so 0 are
+  registered), platform support, Claude Code configuration (`.mcp.json`
+  or `claude mcp add`), live smoke test path and variable, reporting
+  channel, and no more fixed test or key counts.
 
 ### Fixed
 
+- `bw_member_update`, `bw_group_update`, `bw_collection_update` and
+  `bw_policy_set` no longer clear state the caller left out.
+- License update tools, `bw_member_grant_sm` / `bw_member_revoke_sm`,
+  `accessAll`, collection `users` and `bw_event_query` filters no longer
+  report success without effect (see Breaking).
+- Writes are no longer repeated after a 5xx answer; reads are now also
+  retried after network errors.
+- The npm bin `bitwarden-mcp` starts the server (it exited with code 0
+  when started through the symlink).
+- `serverInfo.version` reports the package version (was `0.1.0`).
+- The OAuth token request honours `HTTP_TIMEOUT_MS`.
 - `tests/live-smoke.test.ts` passed the `buildClients` promise instead of
   its result, so the opt-in live smoke registered no instance tools.
 
-## [0.1.1] — 2026-06-14
+### Security
 
-A hardening, tooling, and documentation pass. No runtime behaviour or
-public tool-surface changes.
+- One scrubber (`src/redact.ts`) for logs and for every error text
+  returned to the client; it covers nested structures, error details,
+  cause chains and free-text messages, and drops stack traces.
+- Confirm previews and `bw_raw_request` write bodies mask secret values;
+  secret create/update results no longer contain the value.
+- Requests never follow redirects, so credentials and request bodies are
+  not re-sent to another location.
+- Paths and ids with dot segments or encoded separators are rejected, so
+  requests stay under the configured API base prefix.
+- Access tokens that are not valid header values are rejected before use.
+- The Secrets Manager SDK load error is logged through the scrubber.
+- Runtime and dev dependency trees have no known advisories
+  (`npm audit` and `npm audit --omit=dev` report 0 vulnerabilities at
+  release time).
+
+### Dependencies
+
+- MCP SDK: `@modelcontextprotocol/server` `^2.4.0` (v2 line) replaces
+  `@modelcontextprotocol/sdk` `^1.0.0` (the v0.1.1 lockfile resolved
+  1.29.0); `@modelcontextprotocol/client` `^2.4.0` is a new dev
+  dependency for tests and the probe. The SDK's stdio transport limits
+  one incoming line to 10 MiB (`STDIO_DEFAULT_MAX_BUFFER_SIZE`); a larger
+  line closes the transport and the process exits.
+- `pino` `^10.4.0`; `dotenv` stays on `^16.4.0` (16.6.1 locked);
+  `@bitwarden/sdk-napi` stays `^1.0.0` (optional).
+- Dev: `@types/node` `^22.20.5`, `vitest` and `@vitest/coverage-v8`
+  `^5.0.5`, `eslint` `^10.13.0` with `@eslint/js` `^10.0.1` as a direct
+  dev dependency, `eslint-config-prettier` `^10.1.8`, `typescript-eslint`
+  `^8.72.1`, `prettier` `^3.9.10`, `tsx` `^4.23.15`, `typescript`
+  `^5.9.3` (typescript-eslint 8.72 does not support TypeScript 7).
+- `zod` comes in through the SDK only (no direct dependency).
+- `package-lock.json` is generated with the npm of
+  `node:24.22.1-bookworm-slim` and contains the `@bitwarden/sdk-napi`
+  binaries for darwin-arm64, darwin-x64, linux-x64-gnu and
+  win32-x64-msvc.
+
+## [0.1.1] - 2026-06-14
+
+A hardening, tooling, and documentation pass. The public tool surface
+did not change.
+
+Correction (added with 0.2.0): this release did change runtime
+behaviour that a caller can notice, although it originally said it did
+not. OAuth token errors no longer contain the upstream reason phrase or
+response body (only the status code), error texts in logs are scrubbed,
+and `bw_raw_request` rejects control characters and backslashes in
+`path`. The lockfile of this release also resolved an older MCP SDK
+(1.29.0).
 
 ### Security
 
-- **Logger redaction** — `src/logger.ts` redacts sensitive keys at four
+- **Logger redaction**: `src/logger.ts` redacts sensitive keys at four
   nesting levels plus `err.stack`/`*.stack`. The single-level pino
   wildcard does not recurse, so each key is enumerated across realistic
   depths, and the key set was completed with common synonyms (`token`,
   `refreshToken`, `apiKey`, `api_key`, `secret`, `key`, `client_id`,
   `cookie`, `set-cookie`).
-- **Error-message scrubbing** — a custom pino `err` serializer scrubs
+- **Error-message scrubbing**: a custom pino `err` serializer scrubs
   secret-shaped substrings (Bearer tokens, `authorization` headers,
   `client_secret` / `access_token` params, and the
   `0.<uuid>.<base64>:<base64>` BWS token) from `err.message` and any
   folded `err.cause.message`, which key-based redaction cannot reach.
-- **OAuth error handling** — `src/http/oauth-token-cache.ts` strips the
+- **OAuth error handling**: `src/http/oauth-token-cache.ts` strips the
   response body from thrown errors and emits only the HTTP status code
   (no upstream-controlled reason phrase). The success-path `res.json()`
   parse is guarded so a non-JSON 2xx body cannot surface inside a
   `SyntaxError`. Prevents a failed token request from echoing the
   submitted `client_secret` back into logs.
-- **Raw-request control characters** — `bw_raw_request` rejects
+- **Raw-request control characters**: `bw_raw_request` rejects
   CR / LF / NUL / tab / backslash in `path` as defense-in-depth against
   future refactors and header-injection attempts.
 
@@ -211,16 +305,16 @@ public tool-surface changes.
 
 ### Added
 
-- `ARCHITECTURE.md` — concise one-page architecture overview.
+- `ARCHITECTURE.md`: concise one-page architecture overview.
 - `CONTRIBUTING.md`, `SECURITY.md`, this `CHANGELOG.md`.
 - `.github/ISSUE_TEMPLATE/` (bug + feature) and a PR template.
-- GitHub Actions CI (`.github/workflows/ci.yml`) — build, test,
+- GitHub Actions CI (`.github/workflows/ci.yml`): build, test,
   typecheck, lint, and format-check on Node 20 and 22.
 - ESLint v9 flat config (`eslint.config.js`) and Prettier 3 config
-  (`.prettierrc.json`, `.prettierignore`) — wired into `npm run lint`
+  (`.prettierrc.json`, `.prettierignore`): wired into `npm run lint`
   and `npm run format`.
 
-## [0.1.0] — 2026-06-14
+## [0.1.0] - 2026-05-26
 
 Initial public release.
 
@@ -238,11 +332,17 @@ Initial public release.
   (`scripts/generate.ts`).
 - `bw_raw_request` escape hatch with explicit instance routing
   (`selfhost` / `cloud` / `sm`).
-- Dual-instance routing wired at construction time — no per-call
+- Dual-instance routing wired at construction time: no per-call
   switching, no accidental cross-instance writes.
 - Confirm-gated writes via `withConfirmGuard` (default on).
 - Slim list projections + `BW_MCP_MAX_LIST_RESPONSE_BYTES` size warning.
 - 180 unit tests with mocked HTTP plus an opt-in live-smoke script.
 
-[0.1.1]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.1.0...v0.1.1
+Correction (added with 0.2.0): the shipped spec
+(`specs/public-api.spec.json`) was empty, so no generated
+`bw_<resource>_<op>_raw` tools were registered.
+
+[Unreleased]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mguttmann/the-real-bitwarden-mcp/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/mguttmann/the-real-bitwarden-mcp/releases/tag/v0.1.1
 [0.1.0]: https://github.com/mguttmann/the-real-bitwarden-mcp/releases/tag/v0.1.0

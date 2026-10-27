@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Open one of these **before** you write code — let's agree on the
+        Open one of these **before** you write code: let's agree on the
         direction first so your PR has a clear runway.
   - type: textarea
     id: problem

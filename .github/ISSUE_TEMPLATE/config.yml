@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/mguttmann/the-real-bitwarden-mcp/security/advisories/new
-    about: Please report security issues privately, not as public issues.
+    url: https://github.com/mguttmann/the-real-bitwarden-mcp/blob/main/SECURITY.md#reporting-a-vulnerability
+    about: Do not post details publicly; SECURITY.md explains how to report.
   - name: Bitwarden product issue
     url: https://bitwarden.com/contact/
     about: For bugs in Bitwarden Server / SDK itself, contact Bitwarden directly.

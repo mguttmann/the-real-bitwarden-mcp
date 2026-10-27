@@ -25,3 +25,6 @@ docs/internal/
 logs/
 tmp/
 *.log
+
+# Release assets (scripts/release-assets.sh)
+release/
