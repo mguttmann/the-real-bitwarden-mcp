@@ -79,6 +79,8 @@ Neither the `bws` CLI nor `@bitwarden/sdk-napi` offer them.
   `BITWARDEN_CONFIRM_WRITES=true` (default), every write tool returns a
   PREVIEW unless the caller passes `confirm: "YES"`. Tools with a `plan`
   function also show the effective request (after merging current state).
+  If reading the current state fails, the error is returned prefixed with
+  `PREVIEW - would execute <tool>` and "nothing was written".
   The model sets `confirm` itself, so this is friction against hasty
   writes, not a security boundary.
 - **Read-only mode** (`withReadOnly` in `src/tools/confirm.ts`): with

@@ -46,7 +46,22 @@ async function previewResult(tool: ToolDef, input: Record<string, unknown>): Pro
     try {
       planned = describePlan(await tool.plan(rest));
     } catch (err) {
-      return asToolError(err);
+      // The plan's pre-read failed: say that this was the preview, so the
+      // upstream error is not taken for a failed write.
+      const error = asToolError(err);
+      const first = error.content[0];
+      const reason = first && first.type === "text" ? first.text : "";
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              `PREVIEW - would execute ${tool.name}, but the preview could not be built; ` +
+              `nothing was written.\n${reason}`,
+          },
+        ],
+        isError: true,
+      };
     }
   }
   return {

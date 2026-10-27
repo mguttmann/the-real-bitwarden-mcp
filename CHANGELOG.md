@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Behaviour changes
+
+- Without `confirm: "YES"`, a write tool whose preview reads the current
+  state first (for example `bw_group_update` with an unknown id) returned
+  the upstream error of that read as is. The error now starts with
+  `PREVIEW - would execute <tool>`, says that the preview could not be
+  built and nothing was written, and ends with the scrubbed upstream
+  message (`isError` stays true). With `confirm: "YES"` the error is
+  unchanged.
+
 ## [0.3.0] - 2026-10-27
 
 New optional tool parameters, limits for response size, input size and

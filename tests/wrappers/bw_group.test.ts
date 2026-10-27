@@ -10,6 +10,7 @@ import {
 } from "../../src/tools/wrappers/bw_group.js";
 import { withConfirmGuard } from "../../src/tools/confirm.js";
 import { fakeApi, textOf } from "../helpers.js";
+import { BitwardenApiError } from "../../src/http/errors.js";
 
 function stubClient(handler: (m: string, p: string, opts?: any) => any) {
   return { request: vi.fn(async (m: string, p: string, opts?: any) => handler(m, p, opts)) };
@@ -180,5 +181,41 @@ describe("bw_group_update keeps state for omitted fields", () => {
     expect(text).toContain('"externalId": "ext-g"');
     expect(text).toMatch(/collections.*not sent/i);
     expect(calls.every((c) => c.method === "GET")).toBe(true);
+  });
+  // Gateway test of 0.3.0: the pre-read 404 came back unlabelled.
+  it("a failed pre-read in the preview is labelled as preview and nothing was written", async () => {
+    const { client, calls } = fakeApi({
+      "GET /public/groups/unknown-id": () => {
+        throw new BitwardenApiError(404, "upstream_error", "Resource not found.");
+      },
+    });
+    const res = await withConfirmGuard(makeGroupUpdateTool(client), true).handler({
+      id: "unknown-id",
+      name: "Renamed",
+    });
+    const text = textOf(res);
+    expect(res.isError).toBe(true);
+    expect(text).toMatch(/^PREVIEW - would execute bw_group_update/);
+    expect(text).toContain("nothing was written");
+    expect(text).toContain("BitwardenApiError[404 upstream_error]: Resource not found.");
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
+  });
+
+  it("with confirm YES a failed pre-read is not labelled as preview", async () => {
+    const { client, calls } = fakeApi({
+      "GET /public/groups/unknown-id": () => {
+        throw new BitwardenApiError(404, "upstream_error", "Resource not found.");
+      },
+    });
+    const res = await withConfirmGuard(makeGroupUpdateTool(client), true).handler({
+      id: "unknown-id",
+      name: "Renamed",
+      confirm: "YES",
+    });
+    const text = textOf(res);
+    expect(res.isError).toBe(true);
+    expect(text).not.toContain("PREVIEW");
+    expect(text).toContain("BitwardenApiError[404 upstream_error]: Resource not found.");
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
   });
 });
