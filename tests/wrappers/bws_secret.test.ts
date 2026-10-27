@@ -7,6 +7,7 @@ import {
   makeSecretDeleteTool,
 } from "../../src/tools/wrappers/bws_secret.js";
 import type { SmSdkClient } from "../../src/http/sm-sdk-client.js";
+import { textOf } from "../helpers.js";
 
 function stubSdk(overrides: Partial<SmSdkClient> = {}): SmSdkClient {
   return {
@@ -47,7 +48,7 @@ describe("bws_secret_* (SDK-backed)", () => {
     const sdk = stubSdk();
     const res = await makeSecretListTool(sdk, "org-1").handler({});
     expect(sdk.secretList).toHaveBeenCalledWith("org-1");
-    const text = res.content[0]!.text as string;
+    const text = textOf(res);
     // SDK list returns identifiers (no value field in response from SDK)
     expect(text).toContain("DB_PASS");
     // Value should not appear (identifier response doesn't include it)
@@ -63,14 +64,14 @@ describe("bws_secret_* (SDK-backed)", () => {
   it("list returns isError when sdk is undefined", async () => {
     const res = await makeSecretListTool(undefined, "org-1").handler({});
     expect(res.isError).toBe(true);
-    expect(res.content[0]!.text).toMatch(/SDK not available/i);
+    expect(textOf(res)).toMatch(/SDK not available/i);
   });
 
   it("get_value calls sdk.secretGet and returns value", async () => {
     const sdk = stubSdk();
     const res = await makeSecretGetValueTool(sdk).handler({ id: "s1" });
     expect(sdk.secretGet).toHaveBeenCalledWith("s1");
-    expect(res.content[0]!.text).toContain("shhh");
+    expect(textOf(res)).toContain("shhh");
   });
 
   it("get_value returns isError when sdk is undefined", async () => {
@@ -106,7 +107,7 @@ describe("bws_secret_* (SDK-backed)", () => {
     const sdk = stubSdk();
     const res = await makeSecretUpdateTool(sdk).handler({ id: "s1", key: "K", value: "V2" });
     expect(res.isError).toBe(true);
-    expect(res.content[0]!.text).toMatch(/organizationId/i);
+    expect(textOf(res)).toMatch(/organizationId/i);
   });
 
   it("update returns isError when sdk is undefined", async () => {

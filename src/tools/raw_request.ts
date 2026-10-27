@@ -122,8 +122,7 @@ export function makeRawRequestTool(deps: RawRequestDeps): ToolDef {
 
       const res = await client.request(method, path, {
         query: input.query as
-          | Record<string, string | number | boolean | undefined | null>
-          | undefined,
+          Record<string, string | number | boolean | undefined | null> | undefined,
         body: input.body,
       });
       return {

@@ -8,6 +8,7 @@ import {
   makeGroupGetMembersTool,
   makeGroupSetMembersTool,
 } from "../../src/tools/wrappers/bw_group.js";
+import { textOf } from "../helpers.js";
 
 function stubClient(handler: (m: string, p: string, opts?: any) => any) {
   return { request: vi.fn(async (m: string, p: string, opts?: any) => handler(m, p, opts)) };
@@ -22,7 +23,7 @@ describe("bw_group_*", () => {
       body: { data: [{ id: "g1", name: "Engineers" }] },
     }));
     const res = await makeGroupListTool(client as any, limits).handler({});
-    expect(res.content[0]!.text).toContain("Engineers");
+    expect(textOf(res)).toContain("Engineers");
   });
 
   it("slim default projection omits collections but keeps id/name/externalId", async () => {
@@ -42,7 +43,7 @@ describe("bw_group_*", () => {
       },
     }));
     const res = await makeGroupListTool(client as any, limits).handler({});
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
     expect(data.groups[0].id).toBe("g1");
     expect(data.groups[0].name).toBe("Eng");
     expect(data.groups[0].externalId).toBe("ext-g1");
@@ -59,7 +60,7 @@ describe("bw_group_*", () => {
     const res = await makeGroupListTool(client as any, limits).handler({
       include: ["collections"],
     });
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
     expect(data.groups[0].collections).toBeDefined();
     expect(data.groups[0].collections).toHaveLength(1);
   });
@@ -97,7 +98,7 @@ describe("bw_group_*", () => {
       body: undefined,
     }));
     const res = await makeGroupDeleteTool(client as any).handler({ id: "g1" });
-    expect(res.content[0]!.text).toContain("deleted");
+    expect(textOf(res)).toContain("deleted");
   });
 
   it("get_members returns array, set_members PUTs memberIds", async () => {
@@ -119,6 +120,6 @@ describe("bw_group_*", () => {
   it("get returns body", async () => {
     const client = stubClient(() => ({ status: 200, headers: new Headers(), body: { id: "g1" } }));
     const res = await makeGroupGetTool(client as any).handler({ id: "g1" });
-    expect(res.content[0]!.text).toContain("g1");
+    expect(textOf(res)).toContain("g1");
   });
 });

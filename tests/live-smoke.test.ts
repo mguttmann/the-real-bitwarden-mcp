@@ -5,15 +5,16 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { loadConfig } from "../src/config.js";
 import { buildClients, buildRegistry } from "../src/index.js";
 import { ToolRegistry } from "../src/tools/registry.js";
+import { textOf } from "./helpers.js";
 
 const live = process.env.RUN_LIVE_TESTS === "1";
 const d = live ? describe : describe.skip;
 
 d("live smoke", () => {
   let reg: ToolRegistry;
-  beforeAll(() => {
+  beforeAll(async () => {
     const cfg = loadConfig();
-    reg = buildRegistry(cfg, buildClients(cfg));
+    reg = buildRegistry(cfg, await buildClients(cfg));
   });
 
   it("self-host: bw_member_list returns a list and does not leak Bearer tokens", async () => {
@@ -21,7 +22,7 @@ d("live smoke", () => {
     if (!tool) return; // skip if selfhost not configured
     const res = await tool.handler({});
     expect(res.isError).toBeFalsy();
-    const text = res.content[0]!.text as string;
+    const text = textOf(res);
     expect(text).toMatch(/"members"/);
     expect(text).not.toMatch(/Bearer\s+[A-Za-z0-9._-]+/);
   });

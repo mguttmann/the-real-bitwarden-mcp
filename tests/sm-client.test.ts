@@ -56,13 +56,13 @@ describe("SmHttpClient (OAuth-backed, scope api.secrets)", () => {
     expect(res.status).toBe(200);
 
     // First call must be the token endpoint with scope=api.secrets
-    expect(calls[0].url).toBe("https://h/identity/connect/token");
-    expect(calls[0].body).toContain("scope=api.secrets");
-    expect(calls[0].body).toContain("grant_type=client_credentials");
-    expect(calls[0].body).toContain("client_id=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    expect(calls[0]!.url).toBe("https://h/identity/connect/token");
+    expect(calls[0]!.body).toContain("scope=api.secrets");
+    expect(calls[0]!.body).toContain("grant_type=client_credentials");
+    expect(calls[0]!.body).toContain("client_id=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
     // Second call must be the API request with the Bearer token
-    expect(calls[1].url).toBe("https://h/api/secrets/abc");
+    expect(calls[1]!.url).toBe("https://h/api/secrets/abc");
   });
 
   it("sends the fetched Bearer token in the Authorization header", async () => {
@@ -133,7 +133,7 @@ describe("SmHttpClient (OAuth-backed, scope api.secrets)", () => {
       "0.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB:CCCCCCCCCCCCCCCCCCCCCC==";
     const colonIdx = rawToken.lastIndexOf(":");
     const oauthPart = rawToken.slice(0, colonIdx);
-    const [, uuid, secret] = oauthPart.split(".");
+    const [, uuid, secret] = oauthPart.split(".") as [string, string, string];
 
     const sentBodies: string[] = [];
     const fetchImpl = fakeFetch(async (req) => {

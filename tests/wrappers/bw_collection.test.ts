@@ -5,6 +5,7 @@ import {
   makeCollectionUpdateTool,
   makeCollectionDeleteTool,
 } from "../../src/tools/wrappers/bw_collection.js";
+import { textOf } from "../helpers.js";
 
 function stubClient(handler: (m: string, p: string, opts?: any) => any) {
   return { request: vi.fn(async (m: string, p: string, opts?: any) => handler(m, p, opts)) };
@@ -19,7 +20,7 @@ describe("bw_collection_*", () => {
       body: { data: [{ id: "c1", externalId: null, groups: [], users: [] }] },
     }));
     const res = await makeCollectionListTool(client as any, limits).handler({});
-    expect(res.content[0]!.text).toContain("c1");
+    expect(textOf(res)).toContain("c1");
   });
 
   it("slim default projection omits groups and users", async () => {
@@ -31,7 +32,7 @@ describe("bw_collection_*", () => {
       },
     }));
     const res = await makeCollectionListTool(client as any, limits).handler({});
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
     expect(data.collections[0].id).toBe("c1");
     expect(data.collections[0].externalId).toBe("ext-1");
     expect(data.collections[0].groups).toBeUndefined();
@@ -49,7 +50,7 @@ describe("bw_collection_*", () => {
     const res = await makeCollectionListTool(client as any, limits).handler({
       include: ["groups", "users"],
     });
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
     expect(data.collections[0].groups).toBeDefined();
     expect(data.collections[0].users).toBeDefined();
   });
@@ -87,6 +88,6 @@ describe("bw_collection_*", () => {
   it("delete DELETEs", async () => {
     const client = stubClient(() => ({ status: 200, headers: new Headers(), body: undefined }));
     const res = await makeCollectionDeleteTool(client as any).handler({ id: "c1" });
-    expect(res.content[0]!.text).toContain("deleted");
+    expect(textOf(res)).toContain("deleted");
   });
 });

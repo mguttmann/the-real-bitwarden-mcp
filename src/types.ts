@@ -7,8 +7,7 @@ export type ToolAnnotations = {
 };
 
 type ToolContent =
-  | { type: "text"; text: string }
-  | { type: "image"; data: string; mimeType: string };
+  { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
 
 export type ToolResult = {
   content: ToolContent[];

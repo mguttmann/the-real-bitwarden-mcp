@@ -7,6 +7,7 @@ import {
   makeProjectDeleteTool,
 } from "../../src/tools/wrappers/bws_project.js";
 import type { SmSdkClient } from "../../src/http/sm-sdk-client.js";
+import { textOf } from "../helpers.js";
 
 function stubSdk(overrides: Partial<SmSdkClient> = {}): SmSdkClient {
   return {
@@ -47,7 +48,7 @@ describe("bws_project_* (SDK-backed)", () => {
     const sdk = stubSdk();
     const res = await makeProjectListTool(sdk, "org-1").handler({});
     expect(sdk.projectList).toHaveBeenCalledWith("org-1");
-    expect(res.content[0]!.text).toContain("infra");
+    expect(textOf(res)).toContain("infra");
   });
 
   it("list accepts organizationId from input", async () => {
@@ -60,14 +61,14 @@ describe("bws_project_* (SDK-backed)", () => {
     const sdk = stubSdk();
     const res = await makeProjectListTool(sdk, undefined).handler({});
     expect(res.isError).toBe(true);
-    expect(res.content[0]!.text).toMatch(/orgId/i);
+    expect(textOf(res)).toMatch(/orgId/i);
   });
 
   it("list returns assignment hint when projects array is empty", async () => {
     const sdk = stubSdk({ projectList: vi.fn(async () => []) });
     const res = await makeProjectListTool(sdk, "org-1").handler({});
     expect(res.isError).toBeUndefined();
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
     expect(data.projects).toEqual([]);
     expect(data.note).toMatch(/no project assignments/i);
   });
@@ -75,14 +76,14 @@ describe("bws_project_* (SDK-backed)", () => {
   it("list returns isError when sdk is undefined", async () => {
     const res = await makeProjectListTool(undefined, "org-1").handler({});
     expect(res.isError).toBe(true);
-    expect(res.content[0]!.text).toMatch(/SDK not available/i);
+    expect(textOf(res)).toMatch(/SDK not available/i);
   });
 
   it("get calls sdk.projectGet", async () => {
     const sdk = stubSdk();
     const res = await makeProjectGetTool(sdk).handler({ id: "p1" });
     expect(sdk.projectGet).toHaveBeenCalledWith("p1");
-    expect(res.content[0]!.text).toContain("infra");
+    expect(textOf(res)).toContain("infra");
   });
 
   it("get returns isError when sdk is undefined", async () => {
@@ -94,7 +95,7 @@ describe("bws_project_* (SDK-backed)", () => {
     const sdk = stubSdk();
     const res = await makeProjectCreateTool(sdk, "org-1").handler({ name: "new" });
     expect(sdk.projectCreate).toHaveBeenCalledWith("org-1", "new");
-    expect(res.content[0]!.text).toContain("new");
+    expect(textOf(res)).toContain("new");
   });
 
   it("create returns isError when sdk is undefined", async () => {
@@ -110,14 +111,14 @@ describe("bws_project_* (SDK-backed)", () => {
       organizationId: "org-1",
     });
     expect(sdk.projectUpdate).toHaveBeenCalledWith("org-1", "p1", "renamed");
-    expect(res.content[0]!.text).toContain("renamed");
+    expect(textOf(res)).toContain("renamed");
   });
 
   it("update requires organizationId", async () => {
     const sdk = stubSdk();
     const res = await makeProjectUpdateTool(sdk).handler({ id: "p1", name: "renamed" });
     expect(res.isError).toBe(true);
-    expect(res.content[0]!.text).toMatch(/organizationId/i);
+    expect(textOf(res)).toMatch(/organizationId/i);
   });
 
   it("update returns isError when sdk is undefined", async () => {

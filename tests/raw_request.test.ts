@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { makeRawRequestTool } from "../src/tools/raw_request.js";
+import { textOf } from "./helpers.js";
 
 function stubClient() {
   return {
@@ -18,6 +19,7 @@ describe("bw_raw_request", () => {
     const tool = makeRawRequestTool({
       selfhost: sh as any,
       cloud: cl as any,
+      sm: undefined,
       confirmWrites: false,
     });
     await tool.handler({ method: "GET", path: "/public/members" });
@@ -34,6 +36,7 @@ describe("bw_raw_request", () => {
     const tool = makeRawRequestTool({
       selfhost: sh as any,
       cloud: cl as any,
+      sm: undefined,
       confirmWrites: false,
     });
     await tool.handler({
@@ -51,11 +54,12 @@ describe("bw_raw_request", () => {
     const tool = makeRawRequestTool({
       selfhost: sh as any,
       cloud: cl as any,
+      sm: undefined,
       confirmWrites: false,
     });
     const res = await tool.handler({ method: "GET", path: "/x", instance: "moon" });
     expect(res.isError).toBe(true);
-    expect(res.content[0].text).toMatch(/instance/i);
+    expect(textOf(res)).toMatch(/instance/i);
   });
 
   it("rejects when targeted instance is not configured", async () => {
@@ -63,11 +67,12 @@ describe("bw_raw_request", () => {
     const tool = makeRawRequestTool({
       selfhost: sh as any,
       cloud: undefined,
+      sm: undefined,
       confirmWrites: false,
     });
     const res = await tool.handler({ method: "GET", path: "/x", instance: "cloud" });
     expect(res.isError).toBe(true);
-    expect(res.content[0].text).toMatch(/cloud.*not configured/i);
+    expect(textOf(res)).toMatch(/cloud.*not configured/i);
   });
 
   it("rejects when path does not start with /", async () => {
@@ -75,6 +80,7 @@ describe("bw_raw_request", () => {
     const tool = makeRawRequestTool({
       selfhost: sh as any,
       cloud: undefined,
+      sm: undefined,
       confirmWrites: false,
     });
     const res = await tool.handler({ method: "GET", path: "public/members" });
@@ -83,19 +89,29 @@ describe("bw_raw_request", () => {
 
   it("returns a preview for non-GET when confirmWrites=true and confirm missing", async () => {
     const sh = stubClient();
-    const tool = makeRawRequestTool({ selfhost: sh as any, cloud: undefined, confirmWrites: true });
+    const tool = makeRawRequestTool({
+      selfhost: sh as any,
+      cloud: undefined,
+      sm: undefined,
+      confirmWrites: true,
+    });
     const res = await tool.handler({
       method: "POST",
       path: "/public/members",
       body: { email: "x@y.z" },
     });
     expect(sh.request).not.toHaveBeenCalled();
-    expect(res.content[0].text).toMatch(/PREVIEW/);
+    expect(textOf(res)).toMatch(/PREVIEW/);
   });
 
   it("executes POST when confirm=YES", async () => {
     const sh = stubClient();
-    const tool = makeRawRequestTool({ selfhost: sh as any, cloud: undefined, confirmWrites: true });
+    const tool = makeRawRequestTool({
+      selfhost: sh as any,
+      cloud: undefined,
+      sm: undefined,
+      confirmWrites: true,
+    });
     await tool.handler({
       method: "POST",
       path: "/public/members",
@@ -107,7 +123,12 @@ describe("bw_raw_request", () => {
 
   it("lets GET through even when confirmWrites=true", async () => {
     const sh = stubClient();
-    const tool = makeRawRequestTool({ selfhost: sh as any, cloud: undefined, confirmWrites: true });
+    const tool = makeRawRequestTool({
+      selfhost: sh as any,
+      cloud: undefined,
+      sm: undefined,
+      confirmWrites: true,
+    });
     await tool.handler({ method: "GET", path: "/public/members" });
     expect(sh.request).toHaveBeenCalled();
   });
@@ -117,6 +138,7 @@ describe("bw_raw_request", () => {
     const tool = makeRawRequestTool({
       selfhost: sh as any,
       cloud: undefined,
+      sm: undefined,
       confirmWrites: false,
     });
     const res = await tool.handler({ method: "GET", path: "/foo\r\nHost: evil.com" });
@@ -129,6 +151,7 @@ describe("bw_raw_request", () => {
     const tool = makeRawRequestTool({
       selfhost: sh as any,
       cloud: undefined,
+      sm: undefined,
       confirmWrites: false,
     });
     const res = await tool.handler({ method: "GET", path: "/\\evil.com/foo" });
@@ -141,6 +164,7 @@ describe("bw_raw_request", () => {
     const tool = makeRawRequestTool({
       selfhost: sh as any,
       cloud: undefined,
+      sm: undefined,
       confirmWrites: false,
     });
     const res = await tool.handler({ method: "GET", path: "/foo\x00bar" });
@@ -153,6 +177,7 @@ describe("bw_raw_request", () => {
     const tool = makeRawRequestTool({
       selfhost: sh as any,
       cloud: undefined,
+      sm: undefined,
       confirmWrites: false,
     });
     const res = await tool.handler({ method: "GET", path: "http://evil.com/x" });
@@ -168,6 +193,7 @@ describe("bw_raw_request", () => {
     const tool = makeRawRequestTool({
       selfhost: sh as any,
       cloud: undefined,
+      sm: undefined,
       confirmWrites: false,
     });
     const res = await tool.handler({ method: "GET", path: "/../../etc/passwd" });

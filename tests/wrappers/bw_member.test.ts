@@ -11,6 +11,7 @@ import {
   makeMemberGrantSmTool,
   makeMemberRevokeSmTool,
 } from "../../src/tools/wrappers/bw_member.js";
+import { textOf } from "../helpers.js";
 
 function stubClient(handler: (m: string, p: string, opts?: any) => any) {
   return { request: vi.fn(async (m: string, p: string, opts?: any) => handler(m, p, opts)) };
@@ -49,7 +50,7 @@ describe("bw_member_list", () => {
     const client = stubClient(() => ({ status: 200, headers: new Headers(), body: pages[i++] }));
     const tool = makeMemberListTool(client as any, limits);
     const res = await tool.handler({});
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
     expect(data.members.map((m: any) => m.id)).toEqual(["a", "b"]);
     expect(client.request).toHaveBeenCalledTimes(2);
   });
@@ -67,7 +68,7 @@ describe("bw_member_list", () => {
     }));
     const tool = makeMemberListTool(client as any, limits);
     const res = await tool.handler({ email_contains: "ALICE" });
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
     expect(data.members).toHaveLength(1);
     expect(data.members[0].email).toBe("Alice@Co");
   });
@@ -82,7 +83,7 @@ describe("bw_member_list", () => {
     }));
     const tool = makeMemberListTool(client as any, bigLimits);
     const res = await tool.handler({});
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
 
     expect(data.members).toHaveLength(250);
     // Nested fields must NOT be present in the slim projection
@@ -120,7 +121,7 @@ describe("bw_member_list", () => {
     }));
     const tool = makeMemberListTool(client as any, limits);
     const res = await tool.handler({ include: ["collections", "groups"] });
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
 
     expect(data.members[0].collections).toBeDefined();
     expect(data.members[0].groups).toBeDefined();
@@ -137,7 +138,7 @@ describe("bw_member_list", () => {
     }));
     const tool = makeMemberListTool(client as any, limits);
     const res = await tool.handler({ include: ["all"] });
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
 
     // Full projection includes everything
     expect(data.members[0].userId).toBeDefined();
@@ -157,7 +158,7 @@ describe("bw_member_list", () => {
     }));
     const tool = makeMemberListTool(client as any, limits, tinyLimit);
     const res = await tool.handler({});
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
 
     expect(data.note).toBeDefined();
     expect(typeof data.note).toBe("string");
@@ -178,8 +179,8 @@ describe("bw_member_list", () => {
     const defaultRes = await tool.handler({});
     const includeRes = await tool.handler({ include: ["all"] });
 
-    const defaultData = JSON.parse(defaultRes.content[0]!.text as string);
-    const includeData = JSON.parse(includeRes.content[0]!.text as string);
+    const defaultData = JSON.parse(textOf(defaultRes));
+    const includeData = JSON.parse(textOf(includeRes));
 
     // Both should have a note, but the messages should differ
     expect(defaultData.note).toMatch(/slim default projection/);
@@ -195,7 +196,7 @@ describe("bw_member_get", () => {
     });
     const tool = makeMemberGetTool(client as any);
     const res = await tool.handler({ id: "abc" });
-    expect(res.content[0]!.text).toContain("abc");
+    expect(textOf(res)).toContain("abc");
   });
 
   it("errors when id missing", async () => {
@@ -222,7 +223,7 @@ describe("bw_member_invite", () => {
     });
     const tool = makeMemberInviteTool(client as any);
     const res = await tool.handler({ email: "x@y.z", type: 2 });
-    expect(res.content[0]!.text).toContain("new");
+    expect(textOf(res)).toContain("new");
   });
 
   it("marks tool destructive", () => {
@@ -273,7 +274,7 @@ describe("bw_member_get_groups / set_groups", () => {
     });
     const tool = makeMemberGetGroupsTool(client as any);
     const res = await tool.handler({ id: "abc" });
-    expect(res.content[0]!.text).toContain("g1");
+    expect(textOf(res)).toContain("g1");
   });
   it("set_groups PUTs an array body", async () => {
     const client = stubClient((m, p, o) => {
@@ -322,7 +323,7 @@ describe("bw_member_grant_sm / revoke_sm", () => {
     };
     const res = await makeMemberGrantSmTool(client as any).handler({ id: "abc" });
     expect(res.isError).toBeFalsy();
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
     expect(data.previousAccessSecretsManager).toBe(false);
     expect(data.currentAccessSecretsManager).toBe(true);
     expect(data.changed).toBe(true);
@@ -347,7 +348,7 @@ describe("bw_member_grant_sm / revoke_sm", () => {
       }),
     };
     const res = await makeMemberGrantSmTool(client as any).handler({ id: "abc" });
-    const data = JSON.parse(res.content[0]!.text as string);
+    const data = JSON.parse(textOf(res));
     expect(data.changed).toBe(false);
     expect(client.request).toHaveBeenCalledTimes(1);
   });

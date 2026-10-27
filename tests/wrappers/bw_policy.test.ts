@@ -4,6 +4,7 @@ import {
   makePolicyGetTool,
   makePolicySetTool,
 } from "../../src/tools/wrappers/bw_policy.js";
+import { textOf } from "../helpers.js";
 
 function stubClient(handler: (m: string, p: string, opts?: any) => any) {
   return { request: vi.fn(async (m: string, p: string, opts?: any) => handler(m, p, opts)) };
@@ -16,7 +17,7 @@ describe("bw_policy_*", () => {
       return { status: 200, headers: new Headers(), body: { data: [{ type: 0, enabled: true }] } };
     });
     const res = await makePolicyListTool(client as any).handler({});
-    expect(res.content[0]!.text).toContain("type");
+    expect(textOf(res)).toContain("type");
   });
 
   it("get fetches by type", async () => {

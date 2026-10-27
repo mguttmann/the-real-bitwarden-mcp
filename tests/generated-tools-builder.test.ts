@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { buildGeneratedTools } from "../src/tools/generated/tools.js";
 import type { OperationDef } from "../src/types.js";
+import { textOf } from "./helpers.js";
 
 const memberList: OperationDef = {
   operationId: "members_list",
@@ -53,7 +54,7 @@ describe("buildGeneratedTools", () => {
     const c = client(() => ({ status: 200, headers: new Headers(), body: pages[i++] }));
     const tools = buildGeneratedTools(c as any, [memberList], { maxItems: 10, maxPages: 5 });
     const res = await tools[0]!.handler({});
-    expect(res.content[0]!.text).toContain('"items"');
+    expect(textOf(res)).toContain('"items"');
     expect(c.request).toHaveBeenCalledTimes(2);
   });
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { withConfirmGuard } from "../src/tools/confirm.js";
 import type { ToolDef } from "../src/types.js";
+import { textOf } from "./helpers.js";
 
 function makeTool(opts: { destructive: boolean; readOnly: boolean }, handler = vi.fn()): ToolDef {
   return {
@@ -42,7 +43,7 @@ describe("withConfirmGuard", () => {
     const guarded = withConfirmGuard(tool, true);
     const res = await guarded.handler({ foo: "bar" });
     expect(inner).not.toHaveBeenCalled();
-    expect(res.content[0].text).toMatch(/PREVIEW/);
+    expect(textOf(res)).toMatch(/PREVIEW/);
   });
 
   it("executes when confirm=YES", async () => {
@@ -51,7 +52,7 @@ describe("withConfirmGuard", () => {
     const guarded = withConfirmGuard(tool, true);
     const res = await guarded.handler({ foo: "bar", confirm: "YES" });
     expect(inner).toHaveBeenCalledWith({ foo: "bar" });
-    expect(res.content[0].text).toBe("ran");
+    expect(textOf(res)).toBe("ran");
   });
 
   it("adds `confirm` to inputSchema when guarded", () => {

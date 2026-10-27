@@ -6,6 +6,7 @@ import {
   makeLicenseSmSeatsUpdateTool,
   makeLicenseSmServiceAccountsUpdateTool,
 } from "../../src/tools/wrappers/bw_license.js";
+import { textOf } from "../helpers.js";
 
 function stubClient(handler: (m: string, p: string, opts?: any) => any) {
   return { request: vi.fn(async (m: string, p: string, opts?: any) => handler(m, p, opts)) };
@@ -18,7 +19,7 @@ describe("bw_license_*", () => {
       return { status: 200, headers: new Headers(), body: { seats: { purchased: 50, used: 32 } } };
     });
     const res = await makeLicenseSubscriptionGetTool(client as any).handler({});
-    expect(res.content[0]!.text).toContain("purchased");
+    expect(textOf(res)).toContain("purchased");
   });
 
   it("seats_update PUTs the nested passwordManager body", async () => {

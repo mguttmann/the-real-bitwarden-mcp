@@ -18,7 +18,7 @@ small PRs land fastest.
 
 ## Local setup
 
-Requires Node.js >= 20.
+Requires Node.js >= 22.12.
 
 ```bash
 git clone https://github.com/mguttmann/the-real-bitwarden-mcp.git
@@ -37,7 +37,7 @@ Every PR must keep all four green:
 npm run build         # tsc strict, NodeNext ESM
 npm test              # 180+ unit tests with mocked HTTP
 npm run typecheck     # tsc --noEmit against tsconfig.typecheck.json
-npm run lint          # eslint v9 flat config
+npm run lint          # eslint flat config
 npm run format:check  # prettier 3
 ```
 
@@ -46,6 +46,21 @@ Optional but appreciated:
 ```bash
 npm run test:coverage # @vitest/coverage-v8 report (target: ≥ 80 %)
 ```
+
+Before a dependency or SDK change, run the container smoke test. It builds
+the tree in `node:24.22.1-bookworm-slim` with `npm ci --no-audit --no-fund
+&& npm run build`, starts `dist/index.js` over stdio with fake credentials
+and no network for protocol revisions 2025-06-18, 2025-11-25 and
+2026-07-28, and checks `tools/list` against
+`tests/fixtures/tool-contract.json`:
+
+```bash
+DOCKER_HOST=unix:///path/to/docker.sock bash scripts/container-smoke.sh
+```
+
+`DOCKER`, `DOCKER_RUN_ARGS`, `NODE_IMAGE` and `SMOKE_WORKDIR` are optional
+(see the script header). `node scripts/stdio-probe.mjs <repoDir>
+<protocolVersion> [envFile]` runs a single probe against a local build.
 
 ## Adding a new tool
 

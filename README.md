@@ -99,14 +99,14 @@ For all of these: use the web vault at `https://<your-host>/#/sm/{orgId}/`.
 
 ## Requirements
 
-- Node ≥ 20.
+- Node ≥ 22.12.
 - A Bitwarden Public-API key (`client_id` / `client_secret`) for at least one
   instance (self-host or cloud).
 - For Secrets Manager: a Machine-Account access token (from the web vault).
 
 ## Platform support
 
-This MCP works on any Node ≥ 20 platform for **all Public API features**
+This MCP works on any Node ≥ 22.12 platform for **all Public API features**
 (members, groups, collections, policies, events, license adjustments,
 member SM-grant/revoke).
 

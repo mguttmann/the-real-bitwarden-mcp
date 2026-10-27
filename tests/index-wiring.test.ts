@@ -6,6 +6,7 @@ import { OAuthTokenCache } from "../src/http/oauth-token-cache.js";
 import type { Config } from "../src/config.js";
 import type { SmSdkClient } from "../src/http/sm-sdk-client.js";
 import { vi } from "vitest";
+import { textOf } from "./helpers.js";
 
 function emptyConfig(overrides: Partial<Config>): Config {
   return {
@@ -119,7 +120,7 @@ describe("buildRegistry", () => {
     expect(stub).toBeDefined();
     const res = await stub!.handler({});
     expect(res.isError).toBe(true);
-    expect((res.content[0]!.text as string).toLowerCase()).toContain("not configured");
+    expect(textOf(res).toLowerCase()).toContain("not configured");
   });
 
   it("registers SM tools with working SDK when smSdk is provided", async () => {
@@ -142,7 +143,7 @@ describe("buildRegistry", () => {
     expect(maList).toBeDefined();
     const maRes = await maList!.handler({});
     expect(maRes.isError).toBe(true);
-    expect(maRes.content[0]!.text).toMatch(/web vault/i);
+    expect(textOf(maRes)).toMatch(/web vault/i);
   });
 
   it("registers SM tools as SDK-unavailable stubs when smSdk is undefined but sm is configured", async () => {
@@ -160,6 +161,6 @@ describe("buildRegistry", () => {
     expect(stub).toBeDefined();
     const res = await stub!.handler({ organizationId: "org-1" });
     expect(res.isError).toBe(true);
-    expect(res.content[0]!.text).toMatch(/SDK not available/i);
+    expect(textOf(res)).toMatch(/SDK not available/i);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { makeEventQueryTool } from "../../src/tools/wrappers/bw_event.js";
+import { textOf } from "../helpers.js";
 
 function stubClient(handler: (m: string, p: string, opts?: any) => any) {
   return { request: vi.fn(async (m: string, p: string, opts?: any) => handler(m, p, opts)) };
@@ -25,12 +26,12 @@ describe("bw_event_query", () => {
     let i = 0;
     const client = stubClient(() => ({ status: 200, headers: new Headers(), body: pages[i++] }));
     const res = await makeEventQueryTool(client as any, limits).handler({});
-    const parsed = JSON.parse(res.content[0]!.text as string);
+    const parsed = JSON.parse(textOf(res));
     expect(parsed.events).toHaveLength(2);
   });
 
   it("defaults to a 24h window when no start/end provided", async () => {
-    const captured: Record<string, string>[] = [];
+    const captured: { start: string; end: string }[] = [];
     const before = Date.now();
     const client = stubClient((_m, _p, o) => {
       captured.push({ start: o.query.start, end: o.query.end });
@@ -68,7 +69,7 @@ describe("bw_event_query", () => {
     const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const end = new Date().toISOString();
     const res = await makeEventQueryTool(client as any, limits).handler({ start, end });
-    const parsed = JSON.parse(res.content[0]!.text as string);
+    const parsed = JSON.parse(textOf(res));
     expect(parsed.note).toBeDefined();
     expect(parsed.note).toMatch(/> 24h window/);
   });
@@ -82,7 +83,7 @@ describe("bw_event_query", () => {
     const start = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
     const end = new Date().toISOString();
     const res = await makeEventQueryTool(client as any, limits).handler({ start, end });
-    const parsed = JSON.parse(res.content[0]!.text as string);
+    const parsed = JSON.parse(textOf(res));
     expect(parsed.note).toBeUndefined();
   });
 });

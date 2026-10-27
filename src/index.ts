@@ -1,5 +1,9 @@
 #!/usr/bin/env node
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+import type { Transport } from "@modelcontextprotocol/server";
+import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
+import type { Logger } from "pino";
 import { loadConfig, type Config } from "./config.js";
 import { createLogger } from "./logger.js";
 import { BitwardenHttpClient } from "./http/bitwarden-http-client.js";
@@ -295,6 +299,24 @@ export function buildRegistry(config: Config, clients: Clients): ToolRegistry {
   return reg;
 }
 
+/**
+ * Serve MCP over stdio. serveStdio picks the protocol era from the client's
+ * opening message: an `initialize` request (2025-11-25, 2025-06-18 and older)
+ * gets a 2025-era instance, served as a hand-wired stdio server; a 2026-07-28
+ * opening gets a modern instance. Both come from the same factory.
+ * `transport` replaces the process pipes (tests).
+ */
+export function startStdio(
+  registry: ToolRegistry,
+  logger: Logger,
+  transport?: Transport,
+): StdioServerHandle {
+  return serveStdio(() => createMcpServer(registry, logger), {
+    legacy: "serve",
+    ...(transport ? { transport } : {}),
+  });
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config.logLevel);
@@ -308,14 +330,26 @@ async function main(): Promise<void> {
   }
 
   const registry = buildRegistry(config, clients);
-  const server = createMcpServer(registry, logger);
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  startStdio(registry, logger);
   logger.info({ tools: registry.size() }, "the-real-bitwarden-mcp ready");
 }
 
-const isDirect = process.argv[1]?.endsWith("index.js") || process.argv[1]?.endsWith("index.ts");
-if (isDirect) {
+/**
+ * True when this module is the process entry point (not imported by tests).
+ * argv[1] is the path Node was started with, which for the npm bin is a
+ * symlink (node_modules/.bin/bitwarden-mcp); import.meta.url is the real
+ * path of this file. Resolving argv[1] makes both comparable.
+ */
+export function isEntryPoint(argv1: string | undefined, moduleUrl: string): boolean {
+  if (!argv1) return false;
+  try {
+    return pathToFileURL(realpathSync(argv1)).href === moduleUrl;
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint(process.argv[1], import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`fatal: ${err instanceof Error ? err.message : err}\n`);
     process.exit(1);

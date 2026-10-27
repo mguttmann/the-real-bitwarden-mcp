@@ -1,6 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { createMcpServer } from "../src/server.js";
 import { ToolRegistry } from "../src/tools/registry.js";
 import { createLogger } from "../src/logger.js";
@@ -56,6 +56,26 @@ describe("createMcpServer", () => {
       arguments: { message: "hi" },
     });
     expect(result.content).toEqual([{ type: "text", text: "hi" }]);
+
+    await client.close();
+    await server.close();
+  });
+
+  it("reports the package.json version as serverInfo.version", async () => {
+    const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+      version: string;
+    };
+    const server = createMcpServer(new ToolRegistry(), createLogger("error"));
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+
+    const client = new Client({ name: "test", version: "0" }, { capabilities: {} });
+    await client.connect(clientTransport);
+
+    expect(client.getServerVersion()).toEqual({
+      name: "the-real-bitwarden-mcp",
+      version: pkg.version,
+    });
 
     await client.close();
     await server.close();

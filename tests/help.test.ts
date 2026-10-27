@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { makeHelpTool } from "../src/tools/help.js";
 import { ToolRegistry } from "../src/tools/registry.js";
 import type { ToolDef } from "../src/types.js";
+import { textOf } from "./helpers.js";
 
 function tool(name: string, desc: string): ToolDef {
   return {
@@ -23,7 +24,7 @@ describe("bw_help", () => {
     reg.register(tool("bw_help", "help"));
     const help = makeHelpTool(reg);
     const res = await help.handler({});
-    const text = res.content[0]!.text as string;
+    const text = textOf(res);
     expect(text).toContain("bw_member_list");
     expect(text).toContain("bw_license_subscription_get");
     expect(text).toContain("bws_project_list");

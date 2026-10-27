@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Behaviour changes
+
+- **Node.js 22.12 or newer is required** (`engines.node` `>=22.12`, was
+  `>=20.0.0`). Node 20 is end of life; the test runner (vitest 5) also
+  needs 22.12.
+- **MCP SDK v2** (`@modelcontextprotocol/server` 2.x replaces
+  `@modelcontextprotocol/sdk` 1.x). The server keeps the low-level `Server`
+  and the hand-written JSON Schemas, so `tools/list` is unchanged: same
+  tool names, required lists, properties and schemas
+  (`tests/fixtures/tool-contract.json`). Stdio is now served through
+  `serveStdio(..., { legacy: "serve" })`:
+  - clients that send `initialize` with 2025-06-18 or 2025-11-25 get the
+    same revision back, as before;
+  - `initialize` with 2026-07-28 is still answered with 2025-11-25;
+  - new: clients that open with the 2026-07-28 revision
+    (`server/discover`, per-request `_meta` envelope) are served at
+    2026-07-28.
+- **Stdio message size limit**: a single incoming JSON-RPC message larger
+  than 10 MiB closes the transport and the process exits (SDK default).
+  The v0.1.1 lockfile pinned SDK 1.29, which had no limit.
+- **`serverInfo.version`** in the `initialize` result now reports the
+  package version from `package.json` (it was hard-coded to `0.1.0`).
+- **npm bin `bitwarden-mcp`** (npx, global install,
+  `node_modules/.bin`) now starts the server. Before, the entry point
+  check compared the file name of `argv[1]`, so a start through the bin
+  symlink exited with code 0 without doing anything. Starting
+  `node dist/index.js` directly is unaffected.
+
+### Changed
+
+- Dependencies: `pino` 10, `@types/node` 22, `vitest` and
+  `@vitest/coverage-v8` 5, `eslint` 10 (with `@eslint/js` as a direct dev
+  dependency), `eslint-config-prettier` 10, current `typescript-eslint`,
+  `prettier`, `tsx`, TypeScript 5.9. `zod` comes in through the SDK only
+  (no direct dependency; `src/` does not use it). `dotenv` stays on 16.
+  `package-lock.json` is generated with the npm of
+  `node:24.22.1-bookworm-slim`; `npm audit` and `npm audit --omit=dev`
+  report 0 vulnerabilities.
+- CI tests Node 22, 24 and 26 (was 20 and 22).
+- `npm run typecheck` now really covers `tests/` and `scripts/` (the
+  inherited `exclude` had dropped them); the type errors this surfaced in
+  tests are fixed.
+
+### Added
+
+- `tests/tool-contract.test.ts`: `tools/list` (names, required lists,
+  property names) pinned against the v0.1.1 production baseline for
+  selfhost+cloud and selfhost+cloud+Secrets Manager.
+- `tests/protocol-versions.test.ts`: negotiation for 2025-06-18,
+  2025-11-25 and 2026-07-28 on the real stdio wiring.
+- `scripts/stdio-probe.mjs` and `scripts/container-smoke.sh`: build in
+  the gateway image and probe `dist/index.js` over stdio without network
+  (see CONTRIBUTING).
+
+### Fixed
+
+- `tests/live-smoke.test.ts` passed the `buildClients` promise instead of
+  its result, so the opt-in live smoke registered no instance tools.
+
 ## [0.1.1] — 2026-06-14
 
 A hardening, tooling, and documentation pass. No runtime behaviour or

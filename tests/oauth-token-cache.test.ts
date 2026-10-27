@@ -3,7 +3,7 @@ import { OAuthTokenCache } from "../src/http/oauth-token-cache.js";
 
 function makeFetch(responses: Response[]) {
   const queue = [...responses];
-  return vi.fn(async () => {
+  return vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => {
     const next = queue.shift();
     if (!next) throw new Error("fetch sequence exhausted");
     return next;
@@ -29,7 +29,7 @@ describe("OAuthTokenCache", () => {
     expect(token).toBe("tok1");
     const call = fetchImpl.mock.calls[0]!;
     expect(call[0]).toBe("https://id.example/connect/token");
-    const body = call[1].body as URLSearchParams;
+    const body = call[1]!.body as URLSearchParams;
     expect(body.get("grant_type")).toBe("client_credentials");
     expect(body.get("client_id")).toBe("organization.x");
     expect(body.get("client_secret")).toBe("shh");

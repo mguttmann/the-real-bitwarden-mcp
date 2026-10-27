@@ -1,0 +1,563 @@
+{
+  "_comment": "Tool contract pinned from the v0.1.1 production baseline (tools/list over stdio). Names sorted, required as advertised, property names sorted. Regenerate only for a deliberate, CHANGELOG-listed contract change.",
+  "selfhostCloud": [
+    {
+      "name": "bw_collection_delete",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_collection_get",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bw_collection_list",
+      "required": [],
+      "properties": ["include"]
+    },
+    {
+      "name": "bw_collection_update",
+      "required": ["id"],
+      "properties": ["confirm", "externalId", "groups", "id", "users"]
+    },
+    {
+      "name": "bw_event_query",
+      "required": [],
+      "properties": ["actingUserId", "end", "ipAddress", "itemId", "start"]
+    },
+    {
+      "name": "bw_group_create",
+      "required": ["name"],
+      "properties": ["accessAll", "collections", "confirm", "externalId", "name"]
+    },
+    {
+      "name": "bw_group_delete",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_group_get",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bw_group_get_members",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bw_group_list",
+      "required": [],
+      "properties": ["include", "name_contains"]
+    },
+    {
+      "name": "bw_group_set_members",
+      "required": ["id", "memberIds"],
+      "properties": ["confirm", "id", "memberIds"]
+    },
+    {
+      "name": "bw_group_update",
+      "required": ["id", "name"],
+      "properties": ["accessAll", "collections", "confirm", "externalId", "id", "name"]
+    },
+    {
+      "name": "bw_help",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bw_license_seats_update",
+      "required": ["seatAdjustment"],
+      "properties": ["confirm", "seatAdjustment"]
+    },
+    {
+      "name": "bw_license_sm_seats_update",
+      "required": ["seatAdjustment"],
+      "properties": ["confirm", "seatAdjustment"]
+    },
+    {
+      "name": "bw_license_sm_service_accounts_update",
+      "required": ["serviceAccountAdjustment"],
+      "properties": ["confirm", "serviceAccountAdjustment"]
+    },
+    {
+      "name": "bw_license_storage_update",
+      "required": ["storageGbAdjustment"],
+      "properties": ["confirm", "storageGbAdjustment"]
+    },
+    {
+      "name": "bw_license_subscription_get",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bw_member_get",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bw_member_get_groups",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bw_member_grant_sm",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_member_invite",
+      "required": ["email", "type"],
+      "properties": [
+        "accessSecretsManager",
+        "collections",
+        "confirm",
+        "email",
+        "externalId",
+        "groups",
+        "type"
+      ]
+    },
+    {
+      "name": "bw_member_list",
+      "required": [],
+      "properties": ["email_contains", "include", "name_contains"]
+    },
+    {
+      "name": "bw_member_reinvite",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_member_remove",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_member_revoke_sm",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_member_set_groups",
+      "required": ["id", "groupIds"],
+      "properties": ["confirm", "groupIds", "id"]
+    },
+    {
+      "name": "bw_member_update",
+      "required": ["id", "type"],
+      "properties": ["collections", "confirm", "externalId", "groups", "id", "type"]
+    },
+    {
+      "name": "bw_org_import",
+      "required": [],
+      "properties": ["confirm", "groups", "largeImport", "members", "overwriteExisting"]
+    },
+    {
+      "name": "bw_policy_get",
+      "required": ["type"],
+      "properties": ["type"]
+    },
+    {
+      "name": "bw_policy_list",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bw_policy_set",
+      "required": ["type", "enabled"],
+      "properties": ["confirm", "data", "enabled", "type"]
+    },
+    {
+      "name": "bw_raw_request",
+      "required": ["method", "path"],
+      "properties": ["body", "confirm", "instance", "method", "path", "query"]
+    },
+    {
+      "name": "bws_access_token_create",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_access_token_list",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_access_token_revoke",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_machine_account_create",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_machine_account_delete",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_machine_account_get",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_machine_account_grant_project",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_machine_account_list",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_machine_account_projects",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_machine_account_revoke_project",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_machine_account_update",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_project_create",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_project_delete",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_project_get",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_project_list",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_project_update",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_secret_create",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_secret_delete",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_secret_get_value",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_secret_list",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bws_secret_update",
+      "required": [],
+      "properties": []
+    }
+  ],
+  "selfhostCloudBws": [
+    {
+      "name": "bw_collection_delete",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_collection_get",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bw_collection_list",
+      "required": [],
+      "properties": ["include"]
+    },
+    {
+      "name": "bw_collection_update",
+      "required": ["id"],
+      "properties": ["confirm", "externalId", "groups", "id", "users"]
+    },
+    {
+      "name": "bw_event_query",
+      "required": [],
+      "properties": ["actingUserId", "end", "ipAddress", "itemId", "start"]
+    },
+    {
+      "name": "bw_group_create",
+      "required": ["name"],
+      "properties": ["accessAll", "collections", "confirm", "externalId", "name"]
+    },
+    {
+      "name": "bw_group_delete",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_group_get",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bw_group_get_members",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bw_group_list",
+      "required": [],
+      "properties": ["include", "name_contains"]
+    },
+    {
+      "name": "bw_group_set_members",
+      "required": ["id", "memberIds"],
+      "properties": ["confirm", "id", "memberIds"]
+    },
+    {
+      "name": "bw_group_update",
+      "required": ["id", "name"],
+      "properties": ["accessAll", "collections", "confirm", "externalId", "id", "name"]
+    },
+    {
+      "name": "bw_help",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bw_license_seats_update",
+      "required": ["seatAdjustment"],
+      "properties": ["confirm", "seatAdjustment"]
+    },
+    {
+      "name": "bw_license_sm_seats_update",
+      "required": ["seatAdjustment"],
+      "properties": ["confirm", "seatAdjustment"]
+    },
+    {
+      "name": "bw_license_sm_service_accounts_update",
+      "required": ["serviceAccountAdjustment"],
+      "properties": ["confirm", "serviceAccountAdjustment"]
+    },
+    {
+      "name": "bw_license_storage_update",
+      "required": ["storageGbAdjustment"],
+      "properties": ["confirm", "storageGbAdjustment"]
+    },
+    {
+      "name": "bw_license_subscription_get",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bw_member_get",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bw_member_get_groups",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bw_member_grant_sm",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_member_invite",
+      "required": ["email", "type"],
+      "properties": [
+        "accessSecretsManager",
+        "collections",
+        "confirm",
+        "email",
+        "externalId",
+        "groups",
+        "type"
+      ]
+    },
+    {
+      "name": "bw_member_list",
+      "required": [],
+      "properties": ["email_contains", "include", "name_contains"]
+    },
+    {
+      "name": "bw_member_reinvite",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_member_remove",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_member_revoke_sm",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bw_member_set_groups",
+      "required": ["id", "groupIds"],
+      "properties": ["confirm", "groupIds", "id"]
+    },
+    {
+      "name": "bw_member_update",
+      "required": ["id", "type"],
+      "properties": ["collections", "confirm", "externalId", "groups", "id", "type"]
+    },
+    {
+      "name": "bw_org_import",
+      "required": [],
+      "properties": ["confirm", "groups", "largeImport", "members", "overwriteExisting"]
+    },
+    {
+      "name": "bw_policy_get",
+      "required": ["type"],
+      "properties": ["type"]
+    },
+    {
+      "name": "bw_policy_list",
+      "required": [],
+      "properties": []
+    },
+    {
+      "name": "bw_policy_set",
+      "required": ["type", "enabled"],
+      "properties": ["confirm", "data", "enabled", "type"]
+    },
+    {
+      "name": "bw_raw_request",
+      "required": ["method", "path"],
+      "properties": ["body", "confirm", "instance", "method", "path", "query"]
+    },
+    {
+      "name": "bws_access_token_create",
+      "required": ["machineAccountId", "name"],
+      "properties": ["expireAt", "machineAccountId", "name"]
+    },
+    {
+      "name": "bws_access_token_list",
+      "required": ["machineAccountId"],
+      "properties": ["machineAccountId"]
+    },
+    {
+      "name": "bws_access_token_revoke",
+      "required": ["machineAccountId", "tokenIds"],
+      "properties": ["machineAccountId", "tokenIds"]
+    },
+    {
+      "name": "bws_machine_account_create",
+      "required": ["name"],
+      "properties": ["name", "organizationId"]
+    },
+    {
+      "name": "bws_machine_account_delete",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bws_machine_account_get",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bws_machine_account_grant_project",
+      "required": ["id", "projectId"],
+      "properties": ["id", "projectId", "read", "write"]
+    },
+    {
+      "name": "bws_machine_account_list",
+      "required": [],
+      "properties": ["organizationId"]
+    },
+    {
+      "name": "bws_machine_account_projects",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bws_machine_account_revoke_project",
+      "required": ["id", "projectId"],
+      "properties": ["id", "projectId"]
+    },
+    {
+      "name": "bws_machine_account_update",
+      "required": ["id", "name"],
+      "properties": ["id", "name"]
+    },
+    {
+      "name": "bws_project_create",
+      "required": ["name"],
+      "properties": ["confirm", "name", "organizationId"]
+    },
+    {
+      "name": "bws_project_delete",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bws_project_get",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bws_project_list",
+      "required": [],
+      "properties": ["organizationId"]
+    },
+    {
+      "name": "bws_project_update",
+      "required": ["id", "name"],
+      "properties": ["confirm", "id", "name", "organizationId"]
+    },
+    {
+      "name": "bws_secret_create",
+      "required": ["key", "value"],
+      "properties": ["confirm", "key", "note", "organizationId", "projectIds", "value"]
+    },
+    {
+      "name": "bws_secret_delete",
+      "required": ["id"],
+      "properties": ["confirm", "id"]
+    },
+    {
+      "name": "bws_secret_get_value",
+      "required": ["id"],
+      "properties": ["id"]
+    },
+    {
+      "name": "bws_secret_list",
+      "required": [],
+      "properties": ["organizationId"]
+    },
+    {
+      "name": "bws_secret_update",
+      "required": ["id", "key", "value"],
+      "properties": ["confirm", "id", "key", "note", "organizationId", "projectIds", "value"]
+    }
+  ]
+}

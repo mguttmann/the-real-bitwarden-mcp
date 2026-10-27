@@ -14,6 +14,7 @@ export default [
       "src/tools/generated/",
       ".remember/",
       "docs/",
+      "tmp/",
     ],
   },
   js.configs.recommended,
