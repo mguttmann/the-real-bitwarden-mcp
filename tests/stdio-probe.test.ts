@@ -1,7 +1,8 @@
 // End to end over stdio: scripts/stdio-probe.mjs starts the server the way
 // the gateway does (`node --env-file=<file> <repo>/dist/index.js`), runs the
 // handshake for each protocol revision and lists the tools. The result must
-// match tests/fixtures/tool-contract.json and package.json's version.
+// be the contract (tests/fixtures/tool-contract.json plus the recorded
+// additions, scripts/tool-contract.mjs) and package.json's version.
 //
 // By default <repo>/dist/index.js is a symlink to src/index.ts in a temp
 // dir (tsx via NODE_OPTIONS), so `npm test` needs no build. With
@@ -14,16 +15,25 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, it, expect } from "vitest";
+import {
+  expectedContract,
+  loadContractFixtures,
+  probeAsContract,
+} from "../scripts/tool-contract.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const probe = join(root, "scripts", "stdio-probe.mjs");
 const tsxLoader = join(root, "node_modules", "tsx", "dist", "loader.mjs");
 const built = process.env.STDIO_PROBE_BUILT === "1";
 
-type ContractEntry = { name: string; required: string[]; properties: string[] };
-const contract = JSON.parse(
-  readFileSync(join(root, "tests", "fixtures", "tool-contract.json"), "utf8"),
-) as Record<"selfhostCloud" | "selfhostCloudBws", ContractEntry[]>;
+const fixtures = loadContractFixtures(root);
+const contract = {
+  selfhostCloud: expectedContract(fixtures.baseline.selfhostCloud, fixtures.added.selfhostCloud),
+  selfhostCloudBws: expectedContract(
+    fixtures.baseline.selfhostCloudBws,
+    fixtures.added.selfhostCloudBws,
+  ),
+};
 const pkgVersion = (
   JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { version: string }
 ).version;
@@ -98,12 +108,6 @@ function runProbe(
   });
 }
 
-function asContract(p: Probe): ContractEntry[] {
-  return p.tools
-    .map((t) => ({ name: t.name, required: t.required, properties: t.props }))
-    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-}
-
 describe.each(["2025-06-18", "2025-11-25", "2026-07-28"])("stdio probe, revision %s", (rev) => {
   for (const cfg of ["selfhostCloud", "selfhostCloudBws"] as const) {
     it(`${cfg}: tools/list matches the contract and serverInfo.version is package.json's`, async () => {
@@ -122,7 +126,7 @@ describe.each(["2025-06-18", "2025-11-25", "2026-07-28"])("stdio probe, revision
       const p = JSON.parse(res.stdout) as Probe;
       expect(p.protocolVersion).toBe(rev);
       expect(p.serverInfo).toEqual({ name: "the-real-bitwarden-mcp", version: pkgVersion });
-      expect(asContract(p)).toEqual(contract[cfg]);
+      expect(probeAsContract(p)).toEqual(contract[cfg]);
     }, 60_000);
   }
 
@@ -133,6 +137,6 @@ describe.each(["2025-06-18", "2025-11-25", "2026-07-28"])("stdio probe, revision
     const res = await runProbe(repo, rev, envFile, { ...baseEnv(), ...instances });
     expect(res.code).toBe(0);
     const p = JSON.parse(res.stdout) as Probe;
-    expect(asContract(p)).toEqual(contract.selfhostCloud);
+    expect(probeAsContract(p)).toEqual(contract.selfhostCloud);
   }, 60_000);
 });

@@ -110,3 +110,55 @@ describe("bw_event_query unsupported filters", () => {
     expect(client.request).not.toHaveBeenCalled();
   });
 });
+
+describe("bw_event_query continuationToken (added in 0.3.0)", () => {
+  it("resumes from the given token: the first request carries it, later pages follow", async () => {
+    const seen: (string | undefined)[] = [];
+    const pages: Record<string, unknown> = {
+      "FAKE-TOKEN-2": { data: [{ type: 2 }], continuationToken: "FAKE-TOKEN-3" },
+      "FAKE-TOKEN-3": { data: [{ type: 3 }] },
+    };
+    const client = stubClient((_m, p, o) => {
+      expect(p).toBe("/public/events");
+      seen.push(o.query.continuationToken);
+      return { status: 200, headers: new Headers(), body: pages[o.query.continuationToken] };
+    });
+    const res = await makeEventQueryTool(client as any, limits).handler({
+      start: "2026-01-01T00:00:00Z",
+      end: "2026-01-02T00:00:00Z",
+      continuationToken: "FAKE-TOKEN-2",
+    });
+    expect(seen).toEqual(["FAKE-TOKEN-2", "FAKE-TOKEN-3"]);
+    const parsed = JSON.parse(textOf(res));
+    expect(parsed.events).toEqual([{ type: 2 }, { type: 3 }]);
+    expect(parsed.continuationToken).toBeNull();
+  });
+
+  it("a token returned after a maxPages stop resumes exactly where the list stopped", async () => {
+    const all: Record<string, { data: { type: number }[]; continuationToken?: string }> = {
+      first: { data: [{ type: 1 }], continuationToken: "FAKE-TOKEN-2" },
+      "FAKE-TOKEN-2": { data: [{ type: 2 }], continuationToken: "FAKE-TOKEN-3" },
+      "FAKE-TOKEN-3": { data: [{ type: 3 }] },
+    };
+    const client = stubClient((_m, _p, o) => ({
+      status: 200,
+      headers: new Headers(),
+      body: all[o.query.continuationToken ?? "first"],
+    }));
+    const tool = makeEventQueryTool(client as any, { maxItems: 1000, maxPages: 1 });
+    const window = { start: "2026-01-01T00:00:00Z", end: "2026-01-02T00:00:00Z" };
+    const first = JSON.parse(textOf(await tool.handler(window)));
+    expect(first).toMatchObject({ truncated: true, continuationToken: "FAKE-TOKEN-2" });
+    const second = JSON.parse(
+      textOf(await tool.handler({ ...window, continuationToken: first.continuationToken })),
+    );
+    expect(second.events).toEqual([{ type: 2 }]);
+    expect(second.continuationToken).toBe("FAKE-TOKEN-3");
+  });
+
+  it("continuationToken is an optional string input", () => {
+    const schema = makeEventQueryTool(stubClient(() => ({})) as any, limits).inputSchema as any;
+    expect(schema.required).toBeUndefined();
+    expect(schema.properties.continuationToken).toMatchObject({ type: "string" });
+  });
+});

@@ -22,7 +22,9 @@ export function makeEventQueryTool(
       "Use at most one of actingUserId / itemId (the API applies only one filter). " +
       "ipAddress is not a filter of the Bitwarden Public API and is rejected; each returned " +
       "event carries its own ipAddress field. " +
-      "Auto-paginates with continuationToken.",
+      "Auto-paginates with continuationToken. When a result is truncated with a " +
+      "continuationToken, call again with the same start/end/filters and that " +
+      "continuationToken to get the next events.",
     inputSchema: {
       type: "object",
       properties: {
@@ -33,6 +35,12 @@ export function makeEventQueryTool(
         ipAddress: {
           type: "string",
           description: "Not supported by the Public API: passing it returns an error.",
+        },
+        continuationToken: {
+          type: "string",
+          description:
+            "Resume a truncated result: the continuationToken it returned. Pass the same " +
+            "start, end and filters as that call.",
         },
       },
       additionalProperties: false,
@@ -81,7 +89,12 @@ export function makeEventQueryTool(
           "GET",
           "/public/events",
           query,
-          limits,
+          {
+            ...limits,
+            ...(typeof input.continuationToken === "string"
+              ? { startToken: input.continuationToken }
+              : {}),
+          },
         );
 
         const payload = {

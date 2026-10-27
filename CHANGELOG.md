@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Behaviour changes
+
+- New optional parameters (names, existing parameters and required lists
+  are unchanged):
+  - `bw_member_invite`: `permissions`, the Custom role flags of a type 4
+    member, sent as given.
+  - `bw_member_update`: `email` and `name`, sent only when given (the API
+    accepts them for claimed members only).
+  - `bw_org_import`: `inviteUsersAfterProvisioning`, sent only when given.
+  - `bw_policy_set`: `metadata`, sent only when given.
+  - `bw_event_query`: `continuationToken`, resumes a truncated result
+    from the token it returned.
+- `bw_org_import`: inside a `members` item only `externalId` is required
+  now; `email` may be left out for a member with `deleted: true`, as the
+  API allows. The tool's top-level required list is unchanged.
+
+### Changed
+
+- Tool contract rule: `tests/fixtures/tool-contract.json` stays the
+  frozen baseline; added optional parameters are recorded in
+  `tests/fixtures/tool-contract-added.json`. `tests/tool-contract.test.ts`,
+  `tests/stdio-probe.test.ts`, `scripts/container-smoke.sh` and
+  `scripts/package-smoke.sh` share the rule in `scripts/tool-contract.mjs`
+  (names and required lists identical, property names a recorded superset
+  of the baseline).
+
 ## [0.2.1] - 2026-10-27
 
 Maintenance release. No behaviour change for callers except the

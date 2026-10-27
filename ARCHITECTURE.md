@@ -106,8 +106,9 @@ Neither the `bws` CLI nor `@bitwarden/sdk-napi` offer them.
 Unit tests with mocked HTTP (`tests/`) cover routing, redaction,
 confirm-gate, pagination, slim projections, error mapping, and the
 config parser. `tests/tool-contract.test.ts` pins the `tools/list`
-surface (names, required lists, property names) against
-`tests/fixtures/tool-contract.json`; `tests/protocol-versions.test.ts`
+surface (names, required lists, property names) against the baseline
+`tests/fixtures/tool-contract.json` plus the optional parameters recorded
+in `tests/fixtures/tool-contract-added.json` (`scripts/tool-contract.mjs`); `tests/protocol-versions.test.ts`
 covers protocol negotiation on the stdio wiring. `tests/stdio-probe.test.ts`
 starts the real entry point as a child process through
 `scripts/stdio-probe.mjs` for every protocol revision and checks the tool

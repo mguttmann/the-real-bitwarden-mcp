@@ -9,8 +9,8 @@
 #    `node --env-file=<env> node_modules/the-real-bitwarden-mcp/dist/index.js`
 #    with fake credentials (.invalid hosts, a format-valid fake
 #    BWS_ACCESS_TOKEN; no tool is called, nothing is contacted).
-# 4. Fails if tools/list differs from tests/fixtures/tool-contract.json
-#    (selfhostCloudBws) or, unless REQUIRE_SDK=0, if the server logs that the
+# 4. Fails if tools/list breaks the tool contract (scripts/tool-contract.mjs,
+#    selfhostCloudBws) or, unless REQUIRE_SDK=0, if the server logs that the
 #    Secrets Manager SDK could not be loaded.
 #
 # Environment (all optional):
@@ -73,25 +73,26 @@ echo "== results"
 # shellcheck disable=SC2016 # JavaScript template literals, not shell
 node --input-type=module -e '
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 const [repo, work, requireSdk, ...versions] = process.argv.slice(1);
-const contract = JSON.parse(readFileSync(`${repo}/tests/fixtures/tool-contract.json`, "utf8"));
-const expected = JSON.stringify(contract.selfhostCloudBws);
+const { loadContractFixtures, contractViolations, probeAsContract } = await import(
+  pathToFileURL(`${repo}/scripts/tool-contract.mjs`).href
+);
+const { baseline, added } = loadContractFixtures(repo);
+const expectedCount = baseline.selfhostCloudBws.length;
 let ok = true;
 for (const v of versions) {
   const p = JSON.parse(readFileSync(`${work}/probe-${v}.json`, "utf8"));
-  const actual = JSON.stringify(
-    p.tools
-      .map((t) => ({ name: t.name, required: t.required, properties: t.props }))
-      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
-  );
-  const match = actual === expected && p.count === contract.selfhostCloudBws.length;
+  const violations = contractViolations(probeAsContract(p), baseline.selfhostCloudBws, added.selfhostCloudBws);
+  const match = violations.length === 0 && p.count === expectedCount;
   const sdkFailed = /sm-sdk: failed to load|module_not_found|binary_not_available/.test(p.stderrTail);
   ok &&= match && !(sdkFailed && requireSdk !== "0");
   console.log(
     `requested=${v} negotiated=${p.protocolVersion} server=${p.serverInfo?.name}@${p.serverInfo?.version} ` +
-      `tools=${p.count}/${contract.selfhostCloudBws.length} contract=${match ? "ok" : "MISMATCH"} ` +
+      `tools=${p.count}/${expectedCount} contract=${match ? "ok" : "MISMATCH"} ` +
       `sdk=${sdkFailed ? "NOT LOADED" : "loaded"}`,
   );
+  for (const line of violations) console.log(`  ${line}`);
   if (sdkFailed) console.log(p.stderrTail);
 }
 process.exit(ok ? 0 : 1);

@@ -53,13 +53,18 @@ threshold is enforced).
 
 ## The tool contract
 
-Tool names and required parameters are a public contract: gateways
-prefix and pin them. `tests/tool-contract.test.ts` compares `tools/list`
-(names, required lists, property names) with
-`tests/fixtures/tool-contract.json`. Do not rename or remove a tool, do
-not rename a parameter and do not add a required parameter. If a change
-adds a tool or an optional parameter, update the fixture in the same
-change and say so in the changelog. Any change a caller can notice
+Tool names, parameter names and required parameters are a public
+contract: gateways prefix and pin them. `tests/fixtures/tool-contract.json`
+is the production baseline (names, required lists, property names per
+tool). `tests/tool-contract.test.ts` checks `tools/list` against it with
+the rule in `scripts/tool-contract.mjs`: tool names and required lists
+identical, property names a superset of the baseline. Do not rename or
+remove a tool or a parameter and do not change a required list. A new
+optional parameter is allowed: record it in
+`tests/fixtures/tool-contract-added.json` (per config and tool) and in the
+changelog in the same change; an unrecorded new property fails the test,
+and so does a removed baseline property. Existing baseline entries are
+never edited. Any change a caller can notice
 (defaults, output shape, errors) goes under "Behaviour changes" in
 `CHANGELOG.md`.
 
@@ -67,8 +72,8 @@ Before a dependency or SDK change, run the container smoke test. It builds
 the tree in `node:24.22.1-bookworm-slim` with `npm ci --no-audit --no-fund
 && npm run build`, starts `dist/index.js` over stdio with fake credentials
 and no network for protocol revisions 2025-06-18, 2025-11-25 and
-2026-07-28, and checks `tools/list` against
-`tests/fixtures/tool-contract.json`:
+2026-07-28, and checks `tools/list` against the tool contract
+(`scripts/tool-contract.mjs`):
 
 ```bash
 DOCKER_HOST=unix:///path/to/docker.sock bash scripts/container-smoke.sh
@@ -105,8 +110,11 @@ binary set `REQUIRE_SDK=0`. `node scripts/stdio-probe.mjs <repoDir>
    (`tests/wrappers/`). `fakeApi()` in `tests/helpers.ts` is a stand-in
    HTTP client that answers from a route table and records every
    request; `textOf()` reads the text of a tool result.
-6. Update `tests/fixtures/tool-contract.json` and the tool count asserted
-   in `tests/tool-contract.test.ts` (see "The tool contract").
+6. A new tool is a deliberate contract change: add its entry to
+   `tests/fixtures/tool-contract.json` (leaving the existing entries as
+   they are), update the tool count asserted in
+   `tests/tool-contract.test.ts` and list it in the changelog (see "The
+   tool contract").
 
 ## Commit style
 

@@ -71,7 +71,9 @@ async function planPolicySet(
       notes.push("no stored policy yet; data sent as null.");
     }
   }
-  return { method: "PUT", path, body: { enabled: input.enabled, data }, notes };
+  const body: Record<string, unknown> = { enabled: input.enabled, data };
+  if ("metadata" in input) body.metadata = input.metadata;
+  return { method: "PUT", path, body, notes };
 }
 
 export function makePolicySetTool(client: BitwardenHttpClient): ToolDef {
@@ -87,6 +89,12 @@ export function makePolicySetTool(client: BitwardenHttpClient): ToolDef {
         type: { type: "integer", minimum: 0 },
         enabled: { type: "boolean" },
         data: { type: ["object", "null"] },
+        metadata: {
+          type: ["object", "null"],
+          description:
+            "Side data for the save, not stored with the policy (e.g. defaultUserCollectionName " +
+            "for type 5, organization data ownership). Omitted: not sent.",
+        },
       },
       required: ["type", "enabled"],
       additionalProperties: false,

@@ -1,0 +1,19 @@
+{
+  "_comment": "Optional parameters added after the v0.1.1 baseline in tool-contract.json, per config and tool (sorted). The baseline never changes; scripts/tool-contract.mjs holds the rule. Every entry is listed in CHANGELOG.md.",
+  "added": {
+    "selfhostCloud": {
+      "bw_event_query": ["continuationToken"],
+      "bw_member_invite": ["permissions"],
+      "bw_member_update": ["email", "name"],
+      "bw_org_import": ["inviteUsersAfterProvisioning"],
+      "bw_policy_set": ["metadata"]
+    },
+    "selfhostCloudBws": {
+      "bw_event_query": ["continuationToken"],
+      "bw_member_invite": ["permissions"],
+      "bw_member_update": ["email", "name"],
+      "bw_org_import": ["inviteUsersAfterProvisioning"],
+      "bw_policy_set": ["metadata"]
+    }
+  }
+}

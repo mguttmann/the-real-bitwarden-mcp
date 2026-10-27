@@ -21,9 +21,7 @@ change that fixes it.
 
 ## Tools and schemas
 
-- [member-schema-drift] `bw_member_invite` does not expose `permissions` for Custom members and `bw_member_update` does not expose the newer `email` / `name` fields (type 3 was removed from the enum in 0.2.0). Kept: changes the tool contract.
-- [import-policy-missing-fields] `bw_org_import` lacks `inviteUsersAfterProvisioning` and requires email on deleted members; `bw_policy_set` lacks metadata. Kept: changes the tool contract.
-- [pagination-not-resumable, pagination-token-not-resumable] List tools return a `continuationToken` (after a `PAGINATION_MAX_PAGES` stop) that no list tool accepts; only `bw_raw_request` can pass it on. Kept: changes the tool contract (a new `continuationToken` input).
+- [member-update-permissions] `bw_member_update` keeps a Custom member's current permissions but cannot set new ones (only `bw_member_invite` got `permissions` in 0.3.0); changing the flags needs `bw_raw_request`. The Public API accepts `permissions` on PUT.
 - [no-input-size-limits] Tool inputs are not validated against the schema or bounded (array lengths, string lengths). Kept: validation and bounds reject calls that work today and need chosen limits (owner decision).
 - [license-delta-lost-update] The `bw_license_*_update` tools are read-modify-write; calls in one process are serialized since 0.2.0, but separate server processes can still lose an update. Kept: the API has no conditional update (upstream).
 - [placeholder-annotations-flip] Stub and placeholder write tools are annotated read-only and have no `confirm` property; configuring Secrets Manager later changes their annotations and schema. Kept: changes the tool contract (placeholders are pinned with no properties).

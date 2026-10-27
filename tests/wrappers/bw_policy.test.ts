@@ -118,3 +118,30 @@ describe("bw_policy_set keeps state for omitted fields", () => {
     expect(client.request.mock.calls.every((c) => c[0] === "GET")).toBe(true);
   });
 });
+
+describe("bw_policy_set metadata (added in 0.3.0)", () => {
+  it("metadata is sent in the PUT body when given", async () => {
+    const { client, calls } = fakeApi({ "PUT /public/policies/5": {} });
+    const metadata = { defaultUserCollectionName: "FAKE-COLLECTION" };
+    await makePolicySetTool(client).handler({ type: 5, enabled: true, data: null, metadata });
+    expect(calls).toEqual([
+      {
+        method: "PUT",
+        path: "/public/policies/5",
+        body: { enabled: true, data: null, metadata },
+      },
+    ]);
+  });
+
+  it("metadata omitted: not sent", async () => {
+    const { client, calls } = fakeApi({ "PUT /public/policies/5": {} });
+    await makePolicySetTool(client).handler({ type: 5, enabled: true, data: null });
+    expect(calls[0]?.body).not.toHaveProperty("metadata");
+  });
+
+  it("metadata is optional in the schema", () => {
+    const schema = makePolicySetTool(fakeApi({}).client).inputSchema as any;
+    expect(schema.required).toEqual(["type", "enabled"]);
+    expect(schema.properties.metadata).toMatchObject({ type: ["object", "null"] });
+  });
+});

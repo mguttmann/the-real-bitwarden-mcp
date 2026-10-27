@@ -157,3 +157,26 @@ describe("fetchAllPages", () => {
     expect(note).not.toMatch(/continuationToken/);
   });
 });
+
+describe("fetchAllPages startToken", () => {
+  it("sends the start token with the first request", async () => {
+    const tokens: unknown[] = [];
+    const request = (async (_m: string, _p: string, o?: { query?: Record<string, unknown> }) => {
+      tokens.push(o?.query?.continuationToken);
+      return { status: 200, headers: new Headers(), body: { data: [1] } };
+    }) as any;
+    const res = await fetchAllPages(
+      request,
+      "GET",
+      "/public/events",
+      { start: "s" },
+      {
+        maxItems: 10,
+        maxPages: 5,
+        startToken: "FAKE-TOKEN-1",
+      },
+    );
+    expect(tokens).toEqual(["FAKE-TOKEN-1"]);
+    expect(res.items).toEqual([1]);
+  });
+});

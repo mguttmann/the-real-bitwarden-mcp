@@ -7,8 +7,10 @@
 # 2. Starts `node --env-file=<env> dist/index.js` with --network none and
 #    fake credentials, for protocol revisions 2025-06-18, 2025-11-25 and
 #    2026-07-28, in two configs: selfhost+cloud and selfhost+cloud+BWS.
-# 3. Prints tool count and negotiated revision per run and fails if the
-#    tools/list contract differs from tests/fixtures/tool-contract.json.
+# 3. Prints tool count and negotiated revision per run and fails if
+#    tools/list breaks the tool contract (scripts/tool-contract.mjs: the
+#    baseline in tests/fixtures/tool-contract.json plus the recorded
+#    additions in tests/fixtures/tool-contract-added.json).
 #
 # Environment (all optional):
 #   DOCKER           docker CLI to use (default: docker). DOCKER_HOST and
@@ -80,24 +82,21 @@ done
 echo "== results"
 run --network none "$NODE_IMAGE" node --input-type=module -e '
 import { readFileSync } from "node:fs";
-const contract = JSON.parse(readFileSync("tests/fixtures/tool-contract.json", "utf8"));
+import { loadContractFixtures, contractViolations, probeAsContract } from "/app/scripts/tool-contract.mjs";
+const { baseline, added } = loadContractFixtures("/app");
 let ok = true;
 for (const cfg of ["selfhostCloud", "selfhostCloudBws"]) {
-  const expected = JSON.stringify(contract[cfg]);
   for (const v of process.argv.slice(1)) {
     const p = JSON.parse(readFileSync(`.smoke-out/${cfg}-${v}.json`, "utf8"));
-    const actual = JSON.stringify(
-      p.tools
-        .map((t) => ({ name: t.name, required: t.required, properties: t.props }))
-        .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
-    );
-    const match = actual === expected;
+    const violations = contractViolations(probeAsContract(p), baseline[cfg], added[cfg]);
+    const match = violations.length === 0;
     ok &&= match;
     console.log(
       `${cfg.padEnd(16)} requested=${v} negotiated=${p.protocolVersion} ` +
         `server=${p.serverInfo?.name}@${p.serverInfo?.version} tools=${p.count} ` +
         `contract=${match ? "ok" : "MISMATCH"}`,
     );
+    for (const line of violations) console.log(`  ${line}`);
   }
 }
 process.exit(ok ? 0 : 1);

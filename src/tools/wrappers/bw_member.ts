@@ -41,6 +41,37 @@ const SM_NOT_SUPPORTED =
 
 type MemberInclude = "collections" | "groups" | "permissions" | "all";
 
+/**
+ * Custom role permission flags of the Public API (PermissionsModel in
+ * bitwarden/server). Flags not given default to false on the server.
+ * Further boolean flags are passed through for newer servers.
+ */
+const PERMISSION_FLAGS = [
+  "accessEventLogs",
+  "accessImportExport",
+  "accessReports",
+  "createNewCollections",
+  "editAnyCollection",
+  "deleteAnyCollection",
+  "manageGroups",
+  "managePolicies",
+  "manageSso",
+  "manageUsers",
+  "manageResetPassword",
+  "manageScim",
+  "manageAccessRules",
+  "manageRotation",
+] as const;
+
+const PERMISSIONS_SCHEMA = {
+  type: "object",
+  description:
+    "Custom role permissions (type 4 only; the API rejects them for other roles). " +
+    "Flags not given are false.",
+  properties: Object.fromEntries(PERMISSION_FLAGS.map((f) => [f, { type: "boolean" }])),
+  additionalProperties: { type: "boolean" },
+};
+
 export function makeMemberListTool(
   client: BitwardenHttpClient,
   limits: Limits,
@@ -157,7 +188,8 @@ export function makeMemberInviteTool(client: BitwardenHttpClient): ToolDef {
   return {
     name: "bw_member_invite",
     description:
-      "Invite a new organization member (self-host). Sends an invitation email and creates an Invited member record. Destructive.",
+      "Invite a new organization member (self-host). Sends an invitation email and creates an Invited member record. " +
+      "For a Custom member (type 4) pass permissions. Destructive.",
     inputSchema: {
       type: "object",
       properties: {
@@ -176,6 +208,7 @@ export function makeMemberInviteTool(client: BitwardenHttpClient): ToolDef {
           description:
             "Not supported by the Bitwarden Public API: true is rejected. Grant Secrets Manager access in the web vault.",
         },
+        permissions: PERMISSIONS_SCHEMA,
       },
       required: ["email", "type"],
       additionalProperties: false,
@@ -191,6 +224,7 @@ export function makeMemberInviteTool(client: BitwardenHttpClient): ToolDef {
             externalId: input.externalId ?? null,
             collections: input.collections ?? [],
             groups: input.groups ?? [],
+            ...("permissions" in input ? { permissions: input.permissions } : {}),
           },
         });
         return jsonResult(res.body ?? null);
@@ -246,6 +280,8 @@ async function planMemberUpdate(
   }
   if ("groups" in input) body.groups = input.groups;
   else notes.push("groups not sent, so group memberships stay unchanged.");
+  if ("email" in input) body.email = input.email;
+  if ("name" in input) body.name = input.name;
   return { method: "PUT", path, body, notes };
 }
 
@@ -255,7 +291,8 @@ export function makeMemberUpdateTool(client: BitwardenHttpClient): ToolDef {
     description:
       "Update an organization member's role and access (self-host). Omitted optional fields keep " +
       "their current value (externalId and collections are read from the member first; groups are " +
-      "left unchanged). Passing collections or groups replaces that whole list. Destructive.",
+      "left unchanged; email and name are only sent when given). Passing collections or groups " +
+      "replaces that whole list. Destructive.",
     inputSchema: {
       type: "object",
       properties: {
@@ -268,6 +305,18 @@ export function makeMemberUpdateTool(client: BitwardenHttpClient): ToolDef {
         externalId: { type: ["string", "null"] },
         collections: { type: "array", items: { type: "object" } },
         groups: { type: "array", items: { type: "string" } },
+        email: {
+          type: "string",
+          format: "email",
+          description:
+            "New email address. The API only accepts it for a claimed member without a master " +
+            "password, on a domain the organization has verified. Omitted: unchanged.",
+        },
+        name: {
+          type: "string",
+          description:
+            "New name. The API only accepts it for a claimed member. Omitted: unchanged.",
+        },
       },
       required: ["id", "type"],
       additionalProperties: false,

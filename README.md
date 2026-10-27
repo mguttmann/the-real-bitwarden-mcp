@@ -52,9 +52,9 @@ the official Bitwarden Cloud, or both.
 - **Hand-written tools** for common flows (`bw_member_list`,
   `bw_license_subscription_get`, `bws_secret_get_value`, ...) plus the
   `bw_raw_request` escape hatch. With self-host and cloud configured the
-  server lists 54 tools, with or without Secrets Manager; this list
-  (names, required parameters, property names) is pinned by
-  `tests/tool-contract.test.ts`.
+  server lists 54 tools, with or without Secrets Manager; names and
+  required parameters are pinned by `tests/tool-contract.test.ts`, and
+  parameters are only ever added (optional), never removed or renamed.
 - **No generated tools in the shipped package:** the generator for
   `bw_<resource>_<op>_raw` tools exists (`npm run generate`), but the
   shipped spec (`specs/public-api.spec.json`) is empty, so 0 generated
@@ -465,8 +465,9 @@ node --env-file=/path/to/.env /path/to/dist/index.js
   lines (one JSON-RPC message each) of at most 10 MiB. A larger line
   closes the transport; the server logs an `error` line and exits with
   code 1, and the client has to start it again.
-- **Tool names are stable.** Tool names and required parameters do not
-  change within a minor release; changes that a caller can notice are
+- **Tool names are stable.** Tool names, parameter names and required
+  parameters do not change and no tool or parameter is removed; a tool
+  may get a new optional parameter. Changes that a caller can notice are
   listed under "Behaviour changes" in the [changelog](CHANGELOG.md).
   `scripts/container-smoke.sh` builds and probes the server the way a
   gateway does (see CONTRIBUTING).
@@ -492,6 +493,23 @@ A short list:
 - `bw_policy_list`, `bw_policy_get`, `bw_policy_set`
 - `bw_event_query`
 - `bw_org_import`
+
+Optional parameters worth knowing:
+
+- `bw_member_invite`: `permissions` sets the Custom role flags of a type 4
+  member (`accessEventLogs`, `manageUsers`, ...; flags not given are false).
+- `bw_member_update`: `email` and `name` change a claimed member's address
+  and name; the API rejects them for other members. Omitted: unchanged.
+- `bw_org_import`: `inviteUsersAfterProvisioning: false` creates new
+  members as Staged without an invitation email; a member with
+  `deleted: true` needs only `externalId`.
+- `bw_policy_set`: `metadata` is passed with the save (for example
+  `defaultUserCollectionName` for policy type 5); it is not stored with
+  the policy.
+- `bw_event_query`: `continuationToken` resumes a truncated result; pass
+  the token it returned with the same `start`, `end` and filters.
+  `bw_member_list`, `bw_group_list` and `bw_collection_list` take no
+  token: the Public API returns those lists in one response.
 
 ### Public API: generated raw tools (self-host)
 

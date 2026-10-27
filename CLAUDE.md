@@ -24,9 +24,11 @@ installed the gateway way on linux x86_64, SDK binary must load). Releases: `REL
 ## Rules
 
 - **Tool contract:** tool names, parameter names and required parameters
-  never change and no tool is removed; gateways prefix and pin them.
-  `tests/tool-contract.test.ts` and `tests/fixtures/tool-contract.json`
-  hold the contract. New environment variables are optional with a safe
+  never change and no tool or parameter is removed; gateways prefix and
+  pin them. Tools may get new optional parameters, recorded in
+  `tests/fixtures/tool-contract-added.json`; the baseline
+  `tests/fixtures/tool-contract.json` is not edited.
+  `tests/tool-contract.test.ts` enforces the rule (`scripts/tool-contract.mjs`). New environment variables are optional with a safe
   default. Every change a caller can notice (defaults, output, errors)
   goes into `CHANGELOG.md` under "Behaviour changes".
 - **Bug fixes:** first a test that fails on the old code, then the fix.

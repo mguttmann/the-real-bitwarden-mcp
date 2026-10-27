@@ -31,16 +31,26 @@ export function makeOrgImportTool(client: BitwardenHttpClient): ToolDef {
           items: {
             type: "object",
             properties: {
-              email: { type: "string", format: "email" },
+              email: {
+                type: "string",
+                format: "email",
+                description: "Required unless deleted is true.",
+              },
               externalId: { type: "string" },
               deleted: { type: "boolean", default: false },
             },
-            required: ["email", "externalId"],
+            required: ["externalId"],
             additionalProperties: false,
           },
         },
         overwriteExisting: { type: "boolean", default: false },
         largeImport: { type: "boolean", default: false },
+        inviteUsersAfterProvisioning: {
+          type: "boolean",
+          description:
+            "false: new members are created as Staged without an invitation email. " +
+            "Omitted: the API default (invite).",
+        },
       },
       additionalProperties: false,
     },
@@ -53,6 +63,9 @@ export function makeOrgImportTool(client: BitwardenHttpClient): ToolDef {
             members: input.members ?? [],
             overwriteExisting: input.overwriteExisting ?? false,
             largeImport: input.largeImport ?? false,
+            ...("inviteUsersAfterProvisioning" in input
+              ? { inviteUsersAfterProvisioning: input.inviteUsersAfterProvisioning }
+              : {}),
           },
         });
         return jsonResult(res.body ?? null);

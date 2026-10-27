@@ -8,6 +8,8 @@ type PageBody<T> = {
 type FetchAllOptions = {
   maxItems: number;
   maxPages: number;
+  /** Token of a previous truncated result; the first request resumes there. */
+  startToken?: string;
 };
 
 type FetchAllResult<T> = {
@@ -30,7 +32,7 @@ export async function fetchAllPages<T>(
   opts: FetchAllOptions,
 ): Promise<FetchAllResult<T>> {
   const items: T[] = [];
-  let continuationToken: string | undefined;
+  let continuationToken: string | undefined = opts.startToken || undefined;
   let pageCount = 0;
   let truncated = false;
 

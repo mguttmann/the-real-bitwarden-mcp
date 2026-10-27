@@ -1,10 +1,13 @@
 // Tool contract guard: the tools/list surface (names, required, property
-// names) must match the production baseline in tests/fixtures/tool-contract.json.
-// A removed or renamed tool, or a changed required list, fails here.
+// names) against the production baseline in tests/fixtures/tool-contract.json.
+// Names and required lists must be identical; property names must be a
+// superset of the baseline, and every added property must be recorded in
+// tests/fixtures/tool-contract-added.json (rule: scripts/tool-contract.mjs).
+// A removed or renamed tool or property, or a changed required list, fails.
 // The SM config runs without the native SDK (smSdk undefined), which is
 // how the real bws_* tool definitions are registered when the binary is
 // missing, so the test is deterministic on every platform.
-import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { buildRegistry, type Clients } from "../src/index.js";
@@ -15,12 +18,14 @@ import { SmHttpClient } from "../src/http/sm-client.js";
 import { OAuthTokenCache } from "../src/http/oauth-token-cache.js";
 import type { Config } from "../src/config.js";
 
-type ContractEntry = { name: string; required: string[]; properties: string[] };
-type Contract = { selfhostCloud: ContractEntry[]; selfhostCloudBws: ContractEntry[] };
+import {
+  contractViolations,
+  expectedContract,
+  loadContractFixtures,
+  type ContractEntry,
+} from "../scripts/tool-contract.mjs";
 
-const contract = JSON.parse(
-  readFileSync(new URL("./fixtures/tool-contract.json", import.meta.url), "utf8"),
-) as Contract;
+const { baseline, added } = loadContractFixtures(fileURLToPath(new URL("..", import.meta.url)));
 
 const instance = {
   apiBase: "https://vault.example.invalid/api",
@@ -97,15 +102,89 @@ async function listContract(withSm: boolean): Promise<ContractEntry[]> {
 }
 
 describe("tool contract", () => {
-  for (const [label, withSm, expected] of [
-    ["selfhost + cloud", false, contract.selfhostCloud],
-    ["selfhost + cloud + BWS (no native SDK)", true, contract.selfhostCloudBws],
+  for (const [label, withSm, cfg] of [
+    ["selfhost + cloud", false, "selfhostCloud"],
+    ["selfhost + cloud + BWS (no native SDK)", true, "selfhostCloudBws"],
   ] as const) {
-    it(`tools/list matches the pinned contract for ${label}`, async () => {
+    it(`tools/list keeps the baseline contract for ${label}`, async () => {
       const actual = await listContract(withSm);
-      expect(actual.map((t) => t.name)).toEqual(expected.map((t) => t.name));
-      expect(actual).toEqual(expected);
+      expect(contractViolations(actual, baseline[cfg], added[cfg])).toEqual([]);
+      expect(actual).toEqual(expectedContract(baseline[cfg], added[cfg]));
       expect(actual).toHaveLength(54);
     });
   }
+});
+
+describe("contract rule", () => {
+  const base: ContractEntry[] = [
+    { name: "bw_a", required: ["id"], properties: ["confirm", "id"] },
+    { name: "bw_b", required: [], properties: [] },
+  ];
+  const withProp = (name: string, extra: string[]) =>
+    base.map((t) =>
+      t.name === name ? { ...t, properties: [...t.properties, ...extra].sort() } : t,
+    );
+
+  it("the baseline itself passes", () => {
+    expect(contractViolations(base, base, {})).toEqual([]);
+  });
+
+  it("removing a baseline property fails", () => {
+    const actual = base.map((t) => (t.name === "bw_a" ? { ...t, properties: ["id"] } : t));
+    expect(contractViolations(actual, base, {})).toEqual([
+      "bw_a: baseline property removed: confirm",
+    ]);
+  });
+
+  it("removing a baseline property still fails when the added list names others", () => {
+    const actual = base.map((t) => (t.name === "bw_a" ? { ...t, properties: ["id", "x"] } : t));
+    expect(contractViolations(actual, base, { bw_a: ["x"] })).toEqual([
+      "bw_a: baseline property removed: confirm",
+    ]);
+  });
+
+  it("a recorded optional property passes", () => {
+    expect(contractViolations(withProp("bw_a", ["note"]), base, { bw_a: ["note"] })).toEqual([]);
+  });
+
+  it("an unrecorded added property fails", () => {
+    expect(contractViolations(withProp("bw_a", ["note"]), base, {})).toEqual([
+      "bw_a: property not recorded in tool-contract-added.json: note",
+    ]);
+  });
+
+  it("a recorded property that the tool does not list fails", () => {
+    expect(contractViolations(base, base, { bw_a: ["note"] })).toEqual([
+      "bw_a: recorded added property missing: note",
+    ]);
+  });
+
+  it("a new property that is also required fails", () => {
+    const actual = base.map((t) =>
+      t.name === "bw_a"
+        ? { ...t, required: ["id", "note"], properties: ["confirm", "id", "note"] }
+        : t,
+    );
+    expect(contractViolations(actual, base, { bw_a: ["note"] })).toEqual([
+      "bw_a: required changed from [id] to [id,note]",
+    ]);
+  });
+
+  it("a removed, renamed or added tool fails", () => {
+    const renamed = [base[0]!, { ...base[1]!, name: "bw_c" }];
+    expect(contractViolations(renamed, base, {})).toEqual([
+      "tool not in the baseline: bw_c",
+      "tool missing: bw_b",
+    ]);
+  });
+
+  it("the added fixture records no property that is already in the baseline", () => {
+    for (const cfg of ["selfhostCloud", "selfhostCloudBws"] as const) {
+      for (const [tool, props] of Object.entries(added[cfg])) {
+        const entry = baseline[cfg].find((t) => t.name === tool);
+        expect(entry, `${cfg} ${tool}`).toBeDefined();
+        for (const p of props) expect(entry!.properties, `${cfg} ${tool}`).not.toContain(p);
+      }
+    }
+  });
 });

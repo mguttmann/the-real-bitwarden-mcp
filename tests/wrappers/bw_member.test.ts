@@ -426,3 +426,90 @@ describe("bw_member type enum", () => {
     }
   });
 });
+
+describe("optional parameters added in 0.3.0", () => {
+  const perms = { accessEventLogs: true, manageGroups: true, manageUsers: false };
+
+  it("bw_member_invite: a Custom member's permissions are sent in the POST body", async () => {
+    const { client, calls } = fakeApi({ "POST /public/members": { id: "new" } });
+    const res = await makeMemberInviteTool(client).handler({
+      email: "x@example.invalid",
+      type: 4,
+      permissions: perms,
+    });
+    expect(res.isError).toBeFalsy();
+    expect(calls).toEqual([
+      {
+        method: "POST",
+        path: "/public/members",
+        body: {
+          email: "x@example.invalid",
+          type: 4,
+          externalId: null,
+          collections: [],
+          groups: [],
+          permissions: perms,
+        },
+      },
+    ]);
+  });
+
+  it("bw_member_invite: without permissions the body carries no permissions key", async () => {
+    const { client, calls } = fakeApi({ "POST /public/members": { id: "new" } });
+    await makeMemberInviteTool(client).handler({ email: "x@example.invalid", type: 4 });
+    expect(calls[0]?.body).not.toHaveProperty("permissions");
+  });
+
+  it("bw_member_invite: permissions is optional and lists the Public API permission flags", () => {
+    const schema = makeMemberInviteTool(fakeApi({}).client).inputSchema as any;
+    expect(schema.required).toEqual(["email", "type"]);
+    expect(schema.properties.permissions.type).toBe("object");
+    expect(Object.keys(schema.properties.permissions.properties)).toEqual(
+      expect.arrayContaining(["accessEventLogs", "manageUsers", "manageResetPassword"]),
+    );
+  });
+
+  it("bw_member_update: email and name are sent when given, without a GET for them", async () => {
+    const { client, calls } = fakeApi({ "PUT /public/members/m1": { id: "m1" } });
+    await makeMemberUpdateTool(client).handler({
+      id: "m1",
+      type: 2,
+      externalId: null,
+      collections: [],
+      email: "new@example.invalid",
+      name: "New Name",
+    });
+    expect(calls).toEqual([
+      {
+        method: "PUT",
+        path: "/public/members/m1",
+        body: {
+          type: 2,
+          externalId: null,
+          collections: [],
+          email: "new@example.invalid",
+          name: "New Name",
+        },
+      },
+    ]);
+  });
+
+  it("bw_member_update: email and name are not sent when omitted", async () => {
+    const { client, calls } = fakeApi({ "PUT /public/members/m1": { id: "m1" } });
+    await makeMemberUpdateTool(client).handler({
+      id: "m1",
+      type: 2,
+      externalId: null,
+      collections: [],
+    });
+    expect(calls[0]?.body).not.toHaveProperty("email");
+    expect(calls[0]?.body).not.toHaveProperty("name");
+  });
+
+  it("bw_member_update: email and name are optional", () => {
+    const schema = makeMemberUpdateTool(fakeApi({}).client).inputSchema as any;
+    expect(schema.required).toEqual(["id", "type"]);
+    expect(schema.properties.email).toMatchObject({ type: "string" });
+    expect(schema.properties.name).toMatchObject({ type: "string" });
+  });
+});
